@@ -1,0 +1,21 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - workspaceRoot
+    properties:
+      workspaceRoot:
+        type: string
+        description: Absolute path to the workspace directory for MCP.
+      loggingLevel:
+        type: string
+        default: DEBUG
+        description: The logging level for the server.
+  commandFunction:
+    # A function that produces the CLI command to start the MCP on stdio.
+    |-
+    (config) => ({ command: 'node', args: ['build/index.js'], env: { WORKSPACE_ROOT: config.workspaceRoot, LOGGING_LEVEL: config.loggingLevel || 'DEBUG' } })
