@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Test directories
+test/
+test_project/
+test_utils/
+
+# Private/Local content
+home/meta/journal/
+home/projects/
+.env
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Prototype files
+projects/pif_prototype/
+
+# npm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local configurations
+*.local
+*.local.*
+
+# Config files
+src/config.ts
+
+# Unimplemented modules
+src/mcp_modules/git/
+src/mcp_modules/vscode/
+home/meta/docs/modules/git.md
+home/meta/docs/modules/vscode.md
