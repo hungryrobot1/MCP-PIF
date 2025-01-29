@@ -16,7 +16,7 @@ This project implements the Model Context Protocol (MCP) as a practical embodime
 ### Setup
 1. Clone the repository:
 ```bash
-git clone [repository-url]
+git clone https://github.com/hungryrobot1/MCP-PIF
 cd mcp-pif
 ```
 
