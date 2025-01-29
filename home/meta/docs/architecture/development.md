@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide outlines patterns and practices for extending and modifying the MCP TypeScript server. It provides a collaborative learning path that supports progressive understanding of the system's architecture and implementation patterns.
+This guide outlines patterns and practices for extending and modifying the MCP-PIF TypeScript server. It provides a collaborative learning path that supports progressive understanding of the system's architecture and implementation patterns.
 
 ## Getting Started
 
@@ -118,7 +118,7 @@ To begin development:
 
 ## Notes on Extension
 
-The MCP TypeScript server is designed to evolve through use. When extending the system:
+The MCP-PIF TypeScript server is designed to evolve through use. When extending the system:
 - Build on existing patterns
 - Maintain type safety
 - Consider cross-module impacts
