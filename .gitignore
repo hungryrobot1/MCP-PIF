@@ -15,9 +15,6 @@ test_utils/
 .idea/
 .DS_Store
 
-# Prototype files
-projects/pif_prototype/
-
 # npm logs
 npm-debug.log*
 yarn-debug.log*
