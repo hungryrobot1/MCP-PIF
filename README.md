@@ -1,4 +1,4 @@
-# Model Context Protocol TypeScript Implementation
+# Model Context Protocol PIF TypeScript Implementation
 
 ## Overview
 This project implements the Model Context Protocol (MCP) as a practical embodiment of the Personal Intelligence Framework (PIF). Through structured tools and progressive interaction patterns, it creates spaces for meaningful development of understanding between humans and AI.
@@ -16,7 +16,7 @@ This project implements the Model Context Protocol (MCP) as a practical embodime
 ### Setup
 1. Clone the repository:
 ```bash
-git clone [repository-url]
+git clone https://github.com/hungryrobot1/MCP-PIF
 cd mcp-pif
 ```
 
