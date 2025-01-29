@@ -10,11 +10,6 @@ test/
 test_project/
 test_utils/
 
-# Private/Local content
-home/meta/journal/
-home/projects/
-.env
-
 # IDE and OS files
 .vscode/
 .idea/
@@ -31,9 +26,6 @@ yarn-error.log*
 # Local configurations
 *.local
 *.local.*
-
-# Config files
-src/config.ts
 
 # Unimplemented modules
 src/mcp_modules/git/

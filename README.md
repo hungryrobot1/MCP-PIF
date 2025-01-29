@@ -16,7 +16,7 @@ This project implements the Model Context Protocol (MCP) as a practical embodime
 ### Setup
 1. Clone the repository:
 ```bash
-git clone https://github.com/hungryrobot1/MCP-PIF
+git clone [repository-url]
 cd mcp-pif
 ```
 
@@ -26,7 +26,7 @@ npm install
 ```
 
 3. Configure the server:
-   - Copy `src/config.template.ts` to `src/config.ts`
+   - Find `src/config.ts`
    - Update the configuration:
      ```typescript
      {
@@ -80,9 +80,9 @@ workspace/
 ```
 
 ### Next Steps
-- Review the [Module Documentation](meta/docs/modules/) for available tools
-- Explore the [Architecture Guide](meta/docs/architecture/) for implementation details
-- Check the [Development Guide](meta/docs/architecture/development.md) for contribution guidelines
+- Review the [Module Documentation](home/meta/docs/modules/) for available tools
+- Explore the [Architecture Guide](home/meta/docs/architecture/) for implementation details
+- Check the [Development Guide](home/meta/docs/architecture/development.md) for contribution guidelines
 
 ### Troubleshooting
 - Ensure all paths in both config files use proper path separators
@@ -212,9 +212,9 @@ This project welcomes contributions that engage with both implementation and the
 
 ## Documentation
 Comprehensive documentation is available:
-- [Module Documentation](meta/docs/modules/): Individual tool documentation
-- [Architecture Guide](meta/docs/architecture/): System design and patterns
-- [Development Guide](meta/docs/architecture/development.md): Implementation patterns
+- [Module Documentation](home/meta/docs/modules/): Individual tool documentation
+- [Architecture Guide](home/meta/docs/architecture/): System design and patterns
+- [Development Guide](home/meta/docs/architecture/development.md): Implementation patterns
 
 ## Future Directions
 The project continues to evolve through:
@@ -232,6 +232,3 @@ This implementation embodies a view where:
 
 ## Notes on Usage
 The system is more than a set of tools - it is a space for exploring how human and AI intelligence can develop through structured interaction. Each session is an opportunity to discover new patterns of understanding and collaboration.
-
-## License
-[License details to be added]
