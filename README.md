@@ -1,5 +1,7 @@
 # Model Context Protocol TypeScript Implementation
 
+[![smithery badge](https://smithery.ai/badge/@hungryrobot1/MCP-PIF)](https://smithery.ai/server/@hungryrobot1/MCP-PIF)
+
 ## Overview
 This project implements the Model Context Protocol (MCP) as a practical embodiment of the Personal Intelligence Framework (PIF). Through structured tools and progressive interaction patterns, it creates spaces for meaningful development of understanding between humans and AI.
 
@@ -12,6 +14,14 @@ This project implements the Model Context Protocol (MCP) as a practical embodime
 - Claude Desktop Client configured for custom servers
 
 > **Note**: This implementation has been primarily tested on Windows. Mac/Linux support coming soon.
+
+### Installing via Smithery
+
+To install MCP PIF for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@hungryrobot1/MCP-PIF):
+
+```bash
+npx -y @smithery/cli install @hungryrobot1/MCP-PIF --client claude
+```
 
 ### Setup
 1. Clone the repository:
