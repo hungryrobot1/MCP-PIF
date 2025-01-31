@@ -82,6 +82,13 @@ Observations on framework development...
 
 ## Implementation Patterns
 
+### Date Handling
+- All dates are handled in UTC
+- When specifying a date range:
+  - Start date ('from') begins at 00:00:00 UTC
+  - End date ('to') includes the full day until 23:59:59 UTC
+- Dates should be provided in YYYY-MM-DD format
+
 ### Entry Structure
 - Timestamped entries create temporal context
 - YAML frontmatter maintains structured metadata

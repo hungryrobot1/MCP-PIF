@@ -106,6 +106,7 @@ ${entry.content}`;
     }
 
     async findEntries(query: JournalQuery): Promise<JournalEntry[]> {
+        // Note: All date handling is done in UTC to ensure consistent behavior across timezones
         try {
             const files = await this.walkDirectory(this.baseDir);
             
@@ -116,14 +117,18 @@ ${entry.content}`;
             let filtered = entries;
             
             if (query.from) {
+                const startDate = new Date(query.from);
+                startDate.setUTCHours(0, 0, 0, 0);
                 filtered = filtered.filter(entry => 
-                    entry.timestamp >= query.from!
+                    entry.timestamp >= startDate
                 );
             }
             
             if (query.to) {
+                const endDate = new Date(query.to);
+                endDate.setUTCHours(23, 59, 59, 999);
                 filtered = filtered.filter(entry => 
-                    entry.timestamp <= query.to!
+                    entry.timestamp <= endDate
                 );
             }
             

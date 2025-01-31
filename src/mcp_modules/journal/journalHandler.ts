@@ -62,17 +62,17 @@ export const JOURNAL_CREATE_TOOL: Tool = {
 
 export const JOURNAL_READ_TOOL: Tool = {
     name: "journal_read",
-    description: "Read journal entries",
+    description: "Read journal entries within a date range. Dates should be in YYYY-MM-DD format. Times are handled in UTC, and the 'to' date is inclusive through end of day.",
     inputSchema: {
         type: "object",
         properties: {
             from: {
                 type: "string",
-                description: "Start date (YYYY-MM-DD)"
+                description: "Start date (YYYY-MM-DD), inclusive from start of day"
             },
             to: {
                 type: "string",
-                description: "End date (YYYY-MM-DD)"
+                description: "End date (YYYY-MM-DD), inclusive through end of day"
             },
             tags: {
                 type: "array",
