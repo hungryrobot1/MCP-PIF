@@ -89,6 +89,50 @@ The filesystem module provides core file and directory operations within the MCP
 }
 ```
 
+### rename
+- **Description**: Rename a file or directory
+- **Arguments**:
+  - `oldPath` (string, required): Current path of the file or directory
+  - `newPath` (string, required): New path/name for the file or directory
+- **Example**:
+```json
+{
+    "oldPath": "src/oldname.ts",
+    "newPath": "src/newname.ts"
+}
+```
+
+### move
+- **Description**: Move a file or directory to a new location
+- **Arguments**:
+  - `sourcePath` (string, required): Source path of the file or directory to move
+  - `targetPath` (string, required): Target path where the file or directory will be moved to
+- **Example**:
+```json
+{
+    "sourcePath": "src/file.ts",
+    "targetPath": "lib/file.ts"
+}
+```
+
+### delete
+- **Description**: Delete a file or directory
+- **Arguments**:
+  - `path` (string, required): Path of the file or directory to delete
+  - `recursive` (boolean, optional): If true, recursively delete directories and their contents
+- **Example**:
+```json
+{
+    "path": "temp/logs.txt"
+}
+
+// Recursive directory deletion
+{
+    "path": "temp/cache",
+    "recursive": true
+}
+```
+
 ## Implementation Patterns
 
 ### Edit Operation
@@ -145,7 +189,28 @@ cd: { "path": "target/dir" }
 mkdir: { "path": "new/nested/dir" }
 ```
 
+### File Management
+```json
+// Rename a file
+rename: { "oldPath": "reports/draft.md", "newPath": "reports/final.md" }
+
+// Move a file to different directory
+move: { "sourcePath": "temp/data.json", "targetPath": "data/archive/data.json" }
+
+// Delete a file
+delete: { "path": "logs/debug.log" }
+
+// Recursively delete a directory
+delete: { "path": "temp/build", "recursive": true }
+```
+
 ## Limitations
+
+### File Deletion
+1. Non-empty directories cannot be deleted without the recursive flag
+2. No trash/recycle bin functionality (deletions are permanent)
+3. No confirmation prompts for destructive operations
+4. Limited atomic guarantees for recursive deletions
 
 ### Edit Operation
 1. Pattern matching requires exact content matches or whitespace-only variations
@@ -193,3 +258,6 @@ mkdir: { "path": "new/nested/dir" }
 - Binary file handling
 - Operation atomicity
 - Event system integration
+- File permission management
+- Recycle bin/trash functionality
+- Operation confirmation options

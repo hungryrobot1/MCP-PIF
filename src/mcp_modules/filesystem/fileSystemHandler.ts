@@ -29,8 +29,23 @@ export interface LsArgs {
     path?: string;
 }
 
+export interface RenameArgs {
+    oldPath: string;
+    newPath: string;
+}
+
+export interface MoveArgs {
+    sourcePath: string;
+    targetPath: string;
+}
+
+export interface DeleteArgs {
+    path: string;
+    recursive?: boolean;
+}
+
 // Union type for all filesystem arguments
-type FileSystemArgs = ReadArgs | WriteArgs | CdArgs | MkdirArgs | LsArgs;
+type FileSystemArgs = ReadArgs | WriteArgs | CdArgs | MkdirArgs | LsArgs | RenameArgs | MoveArgs | DeleteArgs;
 
 export class FileSystemHandler implements MCPModuleHandler<FileSystemArgs> {
     name = 'filesystem';
@@ -145,6 +160,60 @@ export class FileSystemHandler implements MCPModuleHandler<FileSystemArgs> {
                 type: "object",
                 properties: {}
             }
+        },
+        {
+            name: "rename",
+            description: "Rename a file or directory",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    oldPath: {
+                        type: "string",
+                        description: "Current path of the file or directory"
+                    },
+                    newPath: {
+                        type: "string",
+                        description: "New path/name for the file or directory"
+                    }
+                },
+                required: ["oldPath", "newPath"]
+            }
+        },
+        {
+            name: "move",
+            description: "Move a file or directory to a new location",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    sourcePath: {
+                        type: "string",
+                        description: "Source path of the file or directory to move"
+                    },
+                    targetPath: {
+                        type: "string",
+                        description: "Target path where the file or directory will be moved to"
+                    }
+                },
+                required: ["sourcePath", "targetPath"]
+            }
+        },
+        {
+            name: "delete",
+            description: "Delete a file or directory",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    path: {
+                        type: "string",
+                        description: "Path of the file or directory to delete"
+                    },
+                    recursive: {
+                        type: "boolean",
+                        description: "If true, recursively delete directories and their contents"
+                    }
+                },
+                required: ["path"]
+            }
         }
     ];
 
@@ -164,6 +233,12 @@ export class FileSystemHandler implements MCPModuleHandler<FileSystemArgs> {
                 return this.handleLs(args as LsArgs, context);
             case 'pwd':
                 return this.handlePwd(context);
+            case 'rename':
+                return this.handleRename(args as RenameArgs, context);
+            case 'move':
+                return this.handleMove(args as MoveArgs, context);
+            case 'delete':
+                return this.handleDelete(args as DeleteArgs, context);
             default:
                 throw new Error(`Unknown tool: ${toolName}`);
         }
@@ -183,6 +258,12 @@ export class FileSystemHandler implements MCPModuleHandler<FileSystemArgs> {
                 return this.isLsArgs(args);
             case 'pwd':
                 return true;  // pwd takes no args
+            case 'rename':
+                return this.isRenameArgs(args);
+            case 'move':
+                return this.isMoveArgs(args);
+            case 'delete':
+                return this.isDeleteArgs(args);
             default:
                 return false;
         }
@@ -248,6 +329,32 @@ export class FileSystemHandler implements MCPModuleHandler<FileSystemArgs> {
         return typeof args === 'object' && 
                args !== null && 
                (!('path' in args) || typeof (args as LsArgs).path === 'string');
+    }
+
+    private isRenameArgs(args: unknown): args is RenameArgs {
+        return typeof args === 'object' && 
+               args !== null && 
+               'oldPath' in args && 
+               'newPath' in args &&
+               typeof (args as RenameArgs).oldPath === 'string' &&
+               typeof (args as RenameArgs).newPath === 'string';
+    }
+
+    private isMoveArgs(args: unknown): args is MoveArgs {
+        return typeof args === 'object' && 
+               args !== null && 
+               'sourcePath' in args && 
+               'targetPath' in args &&
+               typeof (args as MoveArgs).sourcePath === 'string' &&
+               typeof (args as MoveArgs).targetPath === 'string';
+    }
+
+    private isDeleteArgs(args: unknown): args is DeleteArgs {
+        return typeof args === 'object' && 
+               args !== null && 
+               'path' in args &&
+               typeof (args as DeleteArgs).path === 'string' &&
+               (!('recursive' in args) || typeof (args as DeleteArgs).recursive === 'boolean');
     }
 
     // Handlers
@@ -417,6 +524,99 @@ export class FileSystemHandler implements MCPModuleHandler<FileSystemArgs> {
                     text: `Error getting current directory: ${error instanceof Error ? error.message : String(error)}`
                 }]
             };
+        }
+    }
+
+    private async handleRename(args: RenameArgs, context: WorkspaceContext): Promise<CallToolResult> {
+        try {
+            const oldPath = context.validatePath(args.oldPath);
+            const newPath = context.validatePath(args.newPath);
+            
+            await this.fs.rename(oldPath, newPath);
+            
+            this.logger.info(`Successfully renamed ${oldPath} to ${newPath}`);
+            
+            return {
+                content: [{
+                    type: "text",
+                    text: `Successfully renamed ${context.getRelativePath(oldPath)} to ${context.getRelativePath(newPath)}`
+                }]
+            };
+        } catch (error) {
+            this.logger.error("Rename operation failed:", error);
+            return {
+                content: [{
+                    type: "text",
+                    text: `Error in rename operation: ${error instanceof Error ? error.message : String(error)}`
+                }]
+            };
+        }
+    }
+
+    private async handleMove(args: MoveArgs, context: WorkspaceContext): Promise<CallToolResult> {
+        try {
+            const sourcePath = context.validatePath(args.sourcePath);
+            const targetPath = context.validatePath(args.targetPath);
+            
+            await this.fs.move(sourcePath, targetPath);
+            
+            this.logger.info(`Successfully moved ${sourcePath} to ${targetPath}`);
+            
+            return {
+                content: [{
+                    type: "text",
+                    text: `Successfully moved ${context.getRelativePath(sourcePath)} to ${context.getRelativePath(targetPath)}`
+                }]
+            };
+        } catch (error) {
+            this.logger.error("Move operation failed:", error);
+            return {
+                content: [{
+                    type: "text",
+                    text: `Error in move operation: ${error instanceof Error ? error.message : String(error)}`
+                }]
+            };
+        }
+    }
+
+    private async handleDelete(args: DeleteArgs, context: WorkspaceContext): Promise<CallToolResult> {
+        try {
+            const targetPath = context.validatePath(args.path);
+            const recursive = args.recursive ?? false;
+            
+            await this.fs.delete(targetPath, recursive);
+            
+            const itemType = await this.getItemType(targetPath, recursive);
+            this.logger.info(`Successfully deleted ${itemType} at ${targetPath}`);
+            
+            return {
+                content: [{
+                    type: "text",
+                    text: `Successfully deleted ${itemType} at ${context.getRelativePath(targetPath)}`
+                }]
+            };
+        } catch (error) {
+            this.logger.error("Delete operation failed:", error);
+            return {
+                content: [{
+                    type: "text",
+                    text: `Error in delete operation: ${error instanceof Error ? error.message : String(error)}`
+                }]
+            };
+        }
+    }
+    
+    private async getItemType(path: string, wasRecursive: boolean): Promise<string> {
+        try {
+            const stats = await this.fs.stat(path);
+            if (stats.isDirectory()) {
+                return wasRecursive ? "directory and its contents" : "empty directory";
+            } else {
+                return "file";
+            }
+        } catch {
+            // If we can't determine (already deleted), provide a generic message
+            return "item";
         }
     }
 }
