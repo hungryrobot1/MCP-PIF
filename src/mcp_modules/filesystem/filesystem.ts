@@ -162,4 +162,49 @@ export class FileSystem {
     getCurrentDirectory(): string {
         return process.cwd();
     }
+
+    async rename(oldPath: string, newPath: string): Promise<void> {
+        try {
+            await fs.rename(oldPath, newPath);
+        } catch (error) {
+            throw new Error(`Failed to rename ${oldPath} to ${newPath}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    async move(sourcePath: string, targetPath: string): Promise<void> {
+        try {
+            // First check if source exists
+            await fs.access(sourcePath);
+            
+            // Ensure target directory exists
+            const targetDir = path.dirname(targetPath);
+            await fs.mkdir(targetDir, { recursive: true });
+            
+            // Move the file/directory
+            await fs.rename(sourcePath, targetPath);
+        } catch (error) {
+            throw new Error(`Failed to move ${sourcePath} to ${targetPath}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    async delete(filePath: string, recursive: boolean = false): Promise<void> {
+        try {
+            const stats = await fs.stat(filePath);
+            
+            if (stats.isDirectory()) {
+                if (recursive) {
+                    // Remove directory recursively
+                    await fs.rm(filePath, { recursive: true, force: true });
+                } else {
+                    // Try to remove only if empty
+                    await fs.rmdir(filePath);
+                }
+            } else {
+                // Remove file
+                await fs.unlink(filePath);
+            }
+        } catch (error) {
+            throw new Error(`Failed to delete ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
 }
