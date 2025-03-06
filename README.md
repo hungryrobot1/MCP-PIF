@@ -1,4 +1,4 @@
-# Model Context Protocol PIF TypeScript Implementation
+# Model Context Protocol TypeScript Implementation
 
 ## Overview
 This project implements the Model Context Protocol (MCP) as a practical embodiment of the Personal Intelligence Framework (PIF). Through structured tools and progressive interaction patterns, it creates spaces for meaningful development of understanding between humans and AI.
@@ -11,12 +11,12 @@ This project implements the Model Context Protocol (MCP) as a practical embodime
 - Model Context Protocol TypeScript SDK
 - Claude Desktop Client configured for custom servers
 
-> **Note**: This implementation has been primarily tested on Windows. Mac/Linux support coming soon.
+> **Note**: This implementation has been tested on both Windows and macOS/Linux systems.
 
 ### Setup
 1. Clone the repository:
 ```bash
-git clone https://github.com/hungryrobot1/MCP-PIF
+git clone [https://github.com/hungryrobot1/MCP-PIF]
 cd mcp-pif
 ```
 
@@ -26,20 +26,10 @@ npm install
 ```
 
 3. Configure the server:
-   - Find `src/config.ts`
-   - Update the configuration:
-     ```typescript
-     {
-         workspaceRoot: "/path/to/your/workspace",  // Absolute path to workspace
-         server: {
-             name: "mcp-pif",
-             version: "0.1.0"
-         },
-         logging: {
-             level: "DEBUG"  // DEBUG, INFO, WARN, ERROR
-         }
-     }
-     ```
+   - Configuration is now auto-detected by default, but you can customize:
+     - Set the `MCP_WORKSPACE_ROOT` environment variable to specify a workspace location
+     - Or set the `MCP_CONFIG` environment variable with a JSON string of configuration options
+     - Or directly edit `src/config.ts` to modify the default configuration
 
 4. Build the server:
 ```bash
@@ -62,7 +52,7 @@ npm run build
      }
      ```
    - Replace `path/to/your/mcp-pif` with your actual repository path
-   - Make sure to use forward slashes (/) or escaped backslashes (\\\\) in paths
+   - Paths are automatically normalized for your operating system
 
 6. Connect Claude Desktop Client:
    - Start or restart the Claude Desktop Client
@@ -85,7 +75,7 @@ workspace/
 - Check the [Development Guide](home/meta/docs/architecture/development.md) for contribution guidelines
 
 ### Troubleshooting
-- Ensure all paths in both config files use proper path separators
+- If manually specifying paths, use platform-appropriate separators (backslashes on Windows, forward slashes on macOS/Linux)
 - Check the Claude Desktop Client logs if connection fails
 - Verify your workspace directory exists and is writable
 - Make sure Node.js and TypeScript versions meet requirements
@@ -96,7 +86,7 @@ workspace/
 The implementation provides a set of core tools designed to support structured interaction:
 
 - **Filesystem Operations**: Navigate and manage workspace context
-  - `pwd`, `cd`, `read`, `write`, `mkdir`
+  - `pwd`, `cd`, `read`, `write`, `mkdir`, `delete`, `move`, `rename`
 - **Reasoning Tools**: Create spaces for structured thought
   - `reason`: Develop connected insights
   - `think`: Create temporal spaces for contemplation
@@ -125,6 +115,25 @@ journal_create: {
     tags: ["development", "patterns"]
 }
 ```
+
+## Cross-Platform Support
+
+The MCP-PIF server is designed to work seamlessly on Windows, macOS, and Linux environments:
+
+### Path Handling
+- All file paths are automatically normalized for the current operating system
+- The workspace root is detected automatically based on the current environment
+- Both absolute and relative paths are supported within the workspace
+
+### Configuration
+- Environment variables provide a cross-platform way to configure the server
+- File operations use Node.js path methods to ensure consistent behavior
+- Journal entries and other data are stored in a platform-independent format
+
+### Development Workflow
+- NPM scripts work on all platforms
+- TypeScript compilation produces platform-agnostic JavaScript
+- Error handling accounts for platform-specific file system behaviors
 
 ## Implementation Framework
 
