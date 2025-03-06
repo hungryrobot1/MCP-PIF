@@ -30,8 +30,7 @@ const CONFIG = {
   // Project information
   projectInfo: {
     name: 'MCP-PIF',
-    description: 'Model Context Protocol implementation for the Personal Intelligence Framework',
-    repositoryUrl: 'https://github.com/username/mcp-pif'
+    description: 'Model Context Protocol implementation for the Personal Intelligence Framework'
   }
 };
 
