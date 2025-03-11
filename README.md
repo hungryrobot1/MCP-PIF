@@ -3,6 +3,10 @@
 ## Overview
 This project implements the Model Context Protocol (MCP) as a practical embodiment of the Personal Intelligence Framework (PIF). Through structured tools and progressive interaction patterns, it creates spaces for meaningful development of understanding between humans and AI.
 
+<a href="https://glama.ai/mcp/servers/fr71fvl2at">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/fr71fvl2at/badge" alt="MCP-PIF Server MCP server" />
+</a>
+
 ## Quick Start
 
 ### Prerequisites
