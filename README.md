@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/hungryrobot1-mcp-pif-badge.png)](https://mseep.ai/app/hungryrobot1-mcp-pif)
+
 # Model Context Protocol TypeScript Implementation
 
 ## Overview
