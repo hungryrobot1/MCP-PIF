@@ -1,64 +1,118 @@
-// src/index.ts
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { WorkspaceContext } from "./core/workspace.js";
-import { Logger, LogLevel } from "./core/logger.js";
-import { FileSystemHandler } from "./mcp_modules/filesystem/fileSystemHandler.js";
-import { ReasoningHandler } from "./mcp_modules/reasoning/reasoningHandler.js";
-import { JournalHandler } from "./mcp_modules/journal/journalHandler.js";
-import config from "./config.js";
+#!/usr/bin/env node
+/**
+ * MCP-PIF Interactive Server Entry Point
+ */
 
-const logger = new Logger("Server");
-Logger.setGlobalLevel(LogLevel[config.logging.level]);
+import { ConfigManager } from './config';
+import { 
+  DatabaseConnection, 
+  createDatabaseConnection,
+  Result
+} from './dal';
+import { 
+  ProjectService, 
+  PermissionService, 
+  DocumentService,
+  MLService
+} from './domain';
+import { InteractiveCLI } from './cli';
+import { getMLConfig } from './config/ml-config';
 
-// Initialize workspace and server
-const workspace = new WorkspaceContext(config.workspaceRoot);
-const server = new Server({
-    name: config.server.name,
-    version: config.server.version
-}, {
-    capabilities: {
-        tools: {}
-    }
-});
-
-// Initialize modules
-const modules = [
-    new FileSystemHandler(),
-    new ReasoningHandler(),
-    new JournalHandler(workspace.getRoot())
-];
-
-// Register tools
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: modules.flatMap(module => module.tools)
-}));
-
-// Handle tool calls
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-    logger.debug("Raw request params:", request.params);
-
-    for (const module of modules) {
-        if (module.validateArgs(name, args)) {
-            logger.debug(`Found handler in ${module.name} module`);
-            return module.handle(name, args, workspace);
-        }
-    }
-    
-    logger.error("Unknown tool requested:", name);
-    throw new Error(`Unknown tool: ${name}`);
-});
-
-// Start server
 async function main() {
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error("MCP TypeScript Server running on stdio");
+  console.log('Starting MCP-PIF v3...\n');
+
+  // Load configuration
+  const configManager = new ConfigManager();
+  const configResult = await configManager.load();
+  if (!configResult.ok) {
+    console.error('Failed to load configuration:', configResult.error.message);
+    process.exit(1);
+  }
+
+  const config = configResult.value;
+  console.log(`Configuration loaded from: ${configManager.getConfigPath()}`);
+
+  // Initialize database
+  const db = createDatabaseConnection({
+    path: config.server.databasePath
+  });
+
+  const dbOpenResult = await db.open();
+  if (!dbOpenResult.ok) {
+    console.error('Failed to open database:', dbOpenResult.error.message);
+    process.exit(1);
+  }
+
+  console.log(`Database initialized at: ${config.server.databasePath}`);
+
+  // Initialize ML service if enabled
+  let mlService: MLService | undefined;
+  const mlConfig = getMLConfig();
+  
+  if (mlConfig.enabled) {
+    console.log('Initializing ML service...');
+    mlService = new MLService(mlConfig);
+    const mlAvailable = await mlService.isAvailable();
+    
+    if (mlAvailable) {
+      console.log(`ML service connected at: ${mlConfig.serviceUrl}`);
+    } else {
+      console.warn('ML service is enabled but not available. Features will be limited.');
+    }
+  } else {
+    console.log('ML service is disabled. Semantic search will not be available.');
+  }
+
+  // Initialize services
+  const projectService = new ProjectService(db, mlService);
+  const permissionService = new PermissionService(projectService);
+  const documentService = new DocumentService(db, permissionService, mlService);
+
+  // Create CLI context
+  const cliContext = {
+    services: {
+      projectService,
+      permissionService,
+      documentService,
+      mlService
+    }
+  };
+
+  // Start interactive CLI
+  const cli = new InteractiveCLI(cliContext);
+
+  // Handle shutdown
+  process.on('SIGINT', async () => {
+    console.log('\nShutting down...');
+    cli.close();
+    db.close();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    console.log('\nShutting down...');
+    cli.close();
+    db.close();
+    process.exit(0);
+  });
+
+  try {
+    await cli.run();
+  } catch (error) {
+    console.error('CLI error:', error);
+  }
+
+  // Cleanup
+  db.close();
+  console.log('Server stopped.');
 }
 
-main().catch((error) => {
-    console.error("Fatal error in main():", error);
+// Run the server
+if (require.main === module) {
+  main().catch(error => {
+    console.error('Fatal error:', error);
     process.exit(1);
-});
+  });
+}
+
+export { main };

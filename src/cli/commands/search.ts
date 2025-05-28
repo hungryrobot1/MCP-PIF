@@ -1,0 +1,111 @@
+/**
+ * Search commands
+ */
+
+import { Command, CommandCategory, CommandOutput, CLIContext } from '../types';
+import { Result } from '../../dal';
+
+export class SearchCommand implements Command {
+  name = 'search';
+  aliases = ['s', 'find', 'f'];
+  description = 'Search for documents';
+  usage = 'search <query> [--project <alias>] [--semantic]';
+  category = CommandCategory.SEARCH;
+
+  async execute(args: string[], context: CLIContext): Promise<Result<CommandOutput, Error>> {
+    if (args.length === 0) {
+      return Result.ok({
+        message: 'Usage: search <query> [--project <alias>] [--semantic]',
+        type: 'error'
+      });
+    }
+
+    try {
+      // Parse arguments
+      const projectIndex = args.indexOf('--project');
+      const useSemanticSearch = args.includes('--semantic');
+      
+      let projectAlias: string | undefined;
+      if (projectIndex !== -1 && projectIndex < args.length - 1) {
+        projectAlias = args[projectIndex + 1];
+      }
+
+      // Extract query (everything except flags)
+      const query = args.filter((arg, i) => 
+        !arg.startsWith('--') && 
+        !(projectIndex !== -1 && i === projectIndex + 1)
+      ).join(' ');
+
+      if (!query) {
+        return Result.ok({
+          message: 'Please provide a search query',
+          type: 'error'
+        });
+      }
+
+      // Get project ID if alias provided
+      let projectId: string | undefined;
+      if (projectAlias) {
+        const projectResult = await context.services.projectService.getProject(projectAlias);
+        if (!projectResult.ok) {
+          return Result.ok({
+            message: `Project not found: ${projectAlias}`,
+            type: 'error'
+          });
+        }
+        projectId = projectResult.value.id;
+      }
+
+      // Perform search
+      console.log(`🔍 Searching for: "${query}"${useSemanticSearch ? ' (semantic)' : ''}...`);
+      
+      const searchResult = await context.services.documentService.searchDocuments(query, {
+        projectIds: projectId ? [projectId] : undefined,
+        limit: 10,
+        useSemanticSearch
+      });
+
+      if (!searchResult.ok) {
+        return Result.ok({
+          message: `Search failed: ${searchResult.error.error.details}`,
+          type: 'error'
+        });
+      }
+
+      if (searchResult.value.length === 0) {
+        return Result.ok({
+          message: 'No documents found',
+          type: 'info'
+        });
+      }
+
+      let message = `📄 Found ${searchResult.value.length} document${searchResult.value.length > 1 ? 's' : ''}:\n\n`;
+      
+      for (const result of searchResult.value) {
+        const path = require('path');
+        const fileName = path.basename(result.document.path);
+        const dirName = path.dirname(result.document.path);
+        const score = result.score.toFixed(3);
+        
+        message += `  ${fileName} (score: ${score})\n`;
+        message += `    📁 ${dirName}\n`;
+        if (result.highlights.length > 0) {
+          message += `    📝 ${result.highlights[0]}\n`;
+        }
+        message += '\n';
+      }
+
+      return Result.ok({
+        message,
+        type: 'success',
+        data: searchResult.value
+      });
+    } catch (error) {
+      return Result.err(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+}
+
+export const searchCommands: Command[] = [
+  new SearchCommand()
+];
