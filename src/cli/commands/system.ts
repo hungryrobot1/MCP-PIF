@@ -1,150 +1,224 @@
-/**
- * System commands
- */
+import { defineCommand } from '../router';
+import { Result } from '../../types/result';
 
-import { Command, CommandCategory, CommandOutput, CLIContext } from '../types';
-import { Result } from '../../dal';
-import { Project } from '../../domain';
-
-export class StatusCommand implements Command {
-  name = 'status';
-  aliases = ['stat', 'st'];
-  description = 'Show server status';
-  usage = 'status';
-  category = CommandCategory.SYSTEM;
-
-  async execute(args: string[], context: CLIContext): Promise<Result<CommandOutput, Error>> {
-    try {
-      // Get open projects count
-      const projectsResult = await context.services.projectService.listProjects();
-      if (!projectsResult.ok) {
-        return Result.err(projectsResult.error.error);
-      }
-
-      const totalProjects = projectsResult.value.length;
-      const openProjects = projectsResult.value.filter((p: Project) => p.isOpen).length;
-
-      // Get accessible roots
-      const rootsResult = await context.services.permissionService.getAccessibleRoots();
-      const accessiblePaths = rootsResult.ok ? rootsResult.value : [];
-
-      let message = '📊 Server Status\n';
-      message += `  Mode: Interactive\n`;
-      message += `  Projects: ${totalProjects} total, ${openProjects} open\n`;
-      message += `  Accessible Paths: ${accessiblePaths.length}\n`;
-
-      if (accessiblePaths.length > 0) {
-        message += '\n  Open Project Roots:\n';
-        for (const root of accessiblePaths) {
-          message += `    • ${root}\n`;
+export const systemCommand = defineCommand({
+  name: 'system',
+  description: 'System management commands',
+  aliases: ['sys'],
+  
+  subcommands: [
+    // Health check
+    {
+      name: 'health',
+      description: 'Check system health',
+      execute: async (_args, _options, context) => {
+        const results: Record<string, any> = {};
+        
+        // Check DAL connection
+        context.output.log('Checking database connection...');
+        try {
+          const dal = await context.services.dal();
+          const projectCount = await dal.projects.list();
+          
+          results.database = {
+            status: 'healthy',
+            connected: true,
+            projects: projectCount.ok ? projectCount.value.length : 0
+          };
+          
+          context.output.success('Database: Connected');
+        } catch (error) {
+          results.database = {
+            status: 'unhealthy',
+            connected: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          };
+          context.output.error('Database: Failed');
         }
+        
+        // Check ML service
+        context.output.log('Checking ML service...');
+        try {
+          const mlClient = context.services.ml();
+          const healthResult = await mlClient.checkHealth();
+          
+          if (healthResult.ok) {
+            results.mlService = {
+              status: healthResult.value.healthy ? 'healthy' : 'unhealthy',
+              ...healthResult.value
+            };
+            
+            if (healthResult.value.healthy) {
+              context.output.success('ML Service: Healthy');
+            } else {
+              context.output.error('ML Service: Unhealthy');
+            }
+          } else {
+            results.mlService = {
+              status: 'unreachable',
+              error: healthResult.error.message
+            };
+            context.output.error('ML Service: Unreachable');
+          }
+        } catch (error) {
+          results.mlService = {
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          };
+          context.output.error('ML Service: Error');
+        }
+        
+        // Check active project
+        context.output.log('Checking active project...');
+        try {
+          const projectService = await context.services.project();
+          const activeResult = await projectService.getActiveProject();
+          
+          if (activeResult.ok) {
+            results.activeProject = activeResult.value ? {
+              status: 'set',
+              alias: activeResult.value.alias,
+              name: activeResult.value.name
+            } : {
+              status: 'none'
+            };
+            
+            if (activeResult.value) {
+              context.output.success(`Active Project: ${activeResult.value.alias}`);
+            } else {
+              context.output.log('Active Project: None');
+            }
+          }
+        } catch (error) {
+          results.activeProject = {
+            status: 'error',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          };
+        }
+        
+        // Overall status
+        const isHealthy = results.database?.status === 'healthy' && 
+                         results.mlService?.status === 'healthy';
+        
+        results.overall = {
+          status: isHealthy ? 'healthy' : 'unhealthy'
+        };
+        
+        context.output.log('');
+        
+        if (context.config.format === 'json') {
+          context.output.json(results);
+        } else {
+          context.output.log(`Overall Status: ${isHealthy ? '✓ Healthy' : '✗ Unhealthy'}`);
+          
+          if (context.config.verbose) {
+            context.output.log('\nDetailed Status:');
+            context.output.json(results);
+          }
+        }
+        
+        return Result.ok(undefined);
       }
-
-      return Result.ok({
-        message,
-        type: 'info'
-      });
-    } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
+    },
+    
+    // Initialize system
+    {
+      name: 'init',
+      description: 'Initialize PIF system',
+      options: [
+        { name: 'ml-url', type: 'string', description: 'ML service URL', default: 'http://localhost:8000' }
+      ],
+      execute: async (_args, options, context) => {
+        context.output.log('Initializing PIF system...\n');
+        
+        // Test database connection
+        const spinner = context.output.spinner('Setting up database...');
+        try {
+          await context.services.dal();
+          spinner.stop();
+          context.output.success('Database initialized');
+        } catch (error) {
+          spinner.stop();
+          context.output.error('Failed to initialize database');
+          return Result.err(error as Error);
+        }
+        
+        // Test ML service
+        const mlUrl = options.mlUrl || 'http://localhost:8000';
+        context.output.log(`\nChecking ML service at ${mlUrl}...`);
+        process.env.ML_SERVICE_URL = mlUrl;
+        
+        const mlClient = context.services.ml();
+        const healthResult = await mlClient.checkHealth();
+        
+        if (!healthResult.ok) {
+          context.output.error('ML service is not reachable');
+          context.output.log('\nMake sure the ML service is running:');
+          context.output.log('  cd ml_module && python -m server');
+          return Result.err(healthResult.error);
+        }
+        
+        if (!healthResult.value.healthy) {
+          context.output.error('ML service is unhealthy');
+          return Result.err(new Error('ML service health check failed'));
+        }
+        
+        context.output.success('ML service connected');
+        
+        context.output.log('\n✓ System initialized successfully!');
+        context.output.log('\nNext steps:');
+        context.output.log('  1. Add a project: pif project add <name> <path>');
+        context.output.log('  2. Activate it: pif project activate <alias>');
+        context.output.log('  3. Search: pif search <query>');
+        
+        return Result.ok(undefined);
+      }
+    },
+    
+    // Show configuration
+    {
+      name: 'config',
+      description: 'Show system configuration',
+      execute: async (_args, _options, context) => {
+        const config = {
+          paths: {
+            database: process.env.PIF_DB_PATH || '~/.mcp-pif/mcp-pif.db',
+            activeProject: process.env.PIF_ACTIVE_FILE || '~/.mcp-pif/active-project',
+            config: process.env.PIF_CONFIG || '~/.mcp-pif/config.json'
+          },
+          services: {
+            mlServiceUrl: process.env.ML_SERVICE_URL || 'http://localhost:8000'
+          },
+          environment: {
+            node: process.version,
+            platform: process.platform,
+            arch: process.arch
+          }
+        };
+        
+        if (context.config.format === 'json') {
+          context.output.json(config);
+        } else {
+          context.output.log('PIF System Configuration:\n');
+          
+          context.output.log('Paths:');
+          Object.entries(config.paths).forEach(([key, value]) => {
+            context.output.log(`  ${key}: ${value}`);
+          });
+          
+          context.output.log('\nServices:');
+          Object.entries(config.services).forEach(([key, value]) => {
+            context.output.log(`  ${key}: ${value}`);
+          });
+          
+          context.output.log('\nEnvironment:');
+          Object.entries(config.environment).forEach(([key, value]) => {
+            context.output.log(`  ${key}: ${value}`);
+          });
+        }
+        
+        return Result.ok(undefined);
+      }
     }
-  }
-}
-
-export class HelpCommand implements Command {
-  name = 'help';
-  aliases = ['h', '?'];
-  description = 'Show help information';
-  usage = 'help [command]';
-  category = CommandCategory.HELP;
-
-  async execute(args: string[], context: CLIContext): Promise<Result<CommandOutput, Error>> {
-    // This will be implemented to use the command registry
-    let message = '🤖 MCP-PIF Interactive Commands\n\n';
-
-    const categories = [
-      CommandCategory.PROJECT,
-      CommandCategory.SEARCH,
-      CommandCategory.SYSTEM,
-      CommandCategory.HELP
-    ];
-
-    for (const category of categories) {
-      message += `${category}:\n`;
-      // In real implementation, we'd get commands from registry
-      message += `  (Commands will be listed here)\n\n`;
-    }
-
-    message += 'Type "help <command>" for detailed usage information.';
-
-    return Result.ok({
-      message,
-      type: 'info'
-    });
-  }
-}
-
-export class ExitCommand implements Command {
-  name = 'exit';
-  aliases = ['quit', 'q'];
-  description = 'Exit the interactive shell';
-  usage = 'exit';
-  category = CommandCategory.SYSTEM;
-
-  async execute(args: string[], context: CLIContext): Promise<Result<CommandOutput, Error>> {
-    context.state.running = false;
-    return Result.ok({
-      message: 'Goodbye! 👋',
-      type: 'info'
-    });
-  }
-}
-
-export class ClearCommand implements Command {
-  name = 'clear';
-  aliases = ['cls'];
-  description = 'Clear the screen';
-  usage = 'clear';
-  category = CommandCategory.SYSTEM;
-
-  async execute(args: string[], context: CLIContext): Promise<Result<CommandOutput, Error>> {
-    // Clear screen
-    process.stdout.write('\x1B[2J\x1B[H');
-    return Result.ok({
-      message: '',
-      type: 'info'
-    });
-  }
-}
-
-export class DiagnosticCommand implements Command {
-  name = 'diagnostic';
-  aliases = ['diag'];
-  description = 'Run system diagnostics (cascade delete check)';
-  usage = 'diagnostic';
-  category = CommandCategory.SYSTEM;
-
-  async execute(args: string[], context: CLIContext): Promise<Result<CommandOutput, Error>> {
-    try {
-      console.log('Running cascade delete diagnostics...\n');
-      
-      // Run the diagnostic
-      await (context.services.projectService as any).checkCascadeDelete();
-      
-      return Result.ok({
-        message: '\nDiagnostic complete',
-        type: 'success'
-      });
-    } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
-    }
-  }
-}
-
-// Export all system commands
-export const systemCommands = [
-  new StatusCommand(),
-  new HelpCommand(),
-  new ExitCommand(),
-  new ClearCommand(),
-  new DiagnosticCommand()
-];
+  ]
+});

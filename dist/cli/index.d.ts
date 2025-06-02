@@ -1,8 +1,3 @@
-/**
- * CLI exports
- */
-export * from './types';
-export * from './runner';
-export * from './commands/project';
-export * from './commands/system';
+#!/usr/bin/env node
+export {};
 //# sourceMappingURL=index.d.ts.map

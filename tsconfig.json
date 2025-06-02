@@ -2,32 +2,42 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
-    "lib": [
-      "ES2022"
-    ],
+    "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
+    "resolveJsonModule": true,
     "moduleResolution": "node",
-    "types": [
-      "jest",
-      "node"
-    ]
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+    "types": ["node", "jest"]
   },
   "include": [
-    "src/**/*",
-    "src/types/**/*.d.ts"
+    "src/**/*"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "**/*.test.ts"
+    "tests",
+    "**/*.test.ts",
+    "**/*.spec.ts"
   ]
 }

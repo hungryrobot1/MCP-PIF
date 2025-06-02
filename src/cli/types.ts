@@ -1,114 +1,122 @@
-/**
- * CLI State Machine for interactive server
- */
+import { Result } from '../types/result';
 
-import { Result } from '../dal';
-
-/**
- * CLI command interface
- */
-export interface Command {
-  name: string;
-  aliases: string[];
-  description: string;
-  usage: string;
-  category: CommandCategory;
-  execute(args: string[], context: CLIContext): Promise<Result<CommandOutput, Error>>;
-}
-
-export enum CommandCategory {
-  PROJECT = 'Project Management',
-  SEARCH = 'Search & Index',
-  SYSTEM = 'System',
-  HELP = 'Help'
-}
-
-export interface CommandOutput {
-  message: string;
-  type: 'success' | 'error' | 'info' | 'warning';
-  data?: any;
-}
-
-/**
- * CLI context passed to commands
- */
+// CLI Architecture Types
 export interface CLIContext {
+  // Services available to commands
   services: {
-    projectService: any; // Will be properly typed
-    permissionService: any;
-    documentService: any;
-    mlService?: any; // Optional ML service
+    project: () => Promise<import('../services/project').IProjectService>;
+    dal: () => Promise<import('../dal').DAL>;
+    ml: () => import('../services/ml-client').IMLClient;
   };
-  state: CLIState;
+  
+  // Output handling
+  output: CLIOutput;
+  
+  // Configuration
+  config: CLIConfig;
 }
 
-/**
- * CLI state
- */
-export interface CLIState {
-  running: boolean;
-  lastCommand?: string;
-  commandHistory: string[];
+export interface CLIOutput {
+  // Basic output
+  log(message: string): void;
+  error(message: string): void;
+  warn(message: string): void;
+  success(message: string): void;
+  
+  // Structured output
+  table(data: any[], columns?: string[]): void;
+  json(data: any): void;
+  
+  // Progress indication
+  spinner(message: string): { stop(): void };
+  progress(current: number, total: number, message?: string): void;
 }
 
-/**
- * Parse command line into command and arguments
- */
-export function parseCommandLine(input: string): { command: string; args: string[] } {
-  const trimmed = input.trim();
-  if (!trimmed) {
-    return { command: '', args: [] };
-  }
-
-  // Simple parsing - can be enhanced with proper shell parsing later
-  const parts = trimmed.split(/\s+/);
-  return {
-    command: parts[0],
-    args: parts.slice(1)
-  };
+export interface CLIConfig {
+  // Output format
+  format: 'human' | 'json' | 'table';
+  
+  // Verbosity
+  verbose: boolean;
+  quiet: boolean;
+  
+  // Color output
+  color: boolean;
 }
 
-/**
- * Format output for display
- */
-export function formatOutput(output: CommandOutput): string {
-  const prefixes = {
-    success: '✅',
-    error: '❌',
-    info: '📊',
-    warning: '⚠️'
-  };
-
-  return `${prefixes[output.type]} ${output.message}`;
+// Command Pattern
+export interface CLICommand {
+  // Command metadata
+  name: string;
+  description: string;
+  aliases?: string[];
+  
+  // Options and arguments
+  options?: CLIOption[];
+  arguments?: CLIArgument[];
+  
+  // Subcommands (for nested commands like "project add")
+  subcommands?: CLICommand[];
+  
+  // Command execution
+  execute?: CLIExecutor;
 }
 
-/**
- * Command registry
- */
-export class CommandRegistry {
-  private commands = new Map<string, Command>();
-  private aliases = new Map<string, string>();
+export interface CLIOption {
+  name: string;
+  description: string;
+  alias?: string;
+  type: 'boolean' | 'string' | 'number' | 'array';
+  required?: boolean;
+  default?: any;
+}
 
-  register(command: Command): void {
-    this.commands.set(command.name, command);
-    
-    // Register aliases
-    for (const alias of command.aliases) {
-      this.aliases.set(alias, command.name);
-    }
-  }
+export interface CLIArgument {
+  name: string;
+  description: string;
+  required?: boolean;
+  variadic?: boolean; // Can accept multiple values
+}
 
-  get(nameOrAlias: string): Command | undefined {
-    // Check if it's an alias first
-    const commandName = this.aliases.get(nameOrAlias) || nameOrAlias;
-    return this.commands.get(commandName);
-  }
+// Command executor
+export type CLIExecutor = (
+  args: Record<string, any>,
+  options: Record<string, any>,
+  context: CLIContext
+) => Promise<Result<void>>;
 
-  getAll(): Command[] {
-    return Array.from(this.commands.values());
-  }
+// Router types
+export interface CLIRouter {
+  // Register commands
+  register(command: CLICommand): void;
+  
+  // Execute a command line
+  execute(argv: string[]): Promise<Result<void>>;
+  
+  // Get help for a command
+  getHelp(commandPath?: string[]): string;
+}
 
-  getByCategory(category: CommandCategory): Command[] {
-    return this.getAll().filter(cmd => cmd.category === category);
-  }
+// Command Registry Pattern (similar to MCP tools)
+export interface CommandRegistry {
+  // Core command groups
+  project: CLICommand;
+  search: CLICommand;
+  thought: CLICommand;
+  file: CLICommand;
+  system: CLICommand;
+}
+
+// Validation types
+export interface ValidationRule<T = any> {
+  validate(value: T): Result<T>;
+  message: string;
+}
+
+// Progress tracking for long operations
+export interface ProgressTracker {
+  start(total: number, message?: string): void;
+  update(current: number, message?: string): void;
+  complete(message?: string): void;
+  fail(error: Error): void;
 }

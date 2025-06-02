@@ -1,78 +1,83 @@
-/**
- * Core database operations using better-sqlite3
- * All operations return Result types for consistent error handling
- */
-
 import Database from 'better-sqlite3';
 import * as path from 'path';
-import { Result, FileSystemError } from '../types';
-import { ensureDirectory } from '../filesystem';
-import {
-  DatabaseConfig,
-  ProjectRecord,
-  DocumentRecord,
-  JournalRecord,
-  CrossReferenceRecord,
-  MigrationRecord
-} from './types';
-import { CREATE_TABLES_SQL, INITIAL_MIGRATION_SQL, SCHEMA_VERSION } from './schema';
+import * as fs from 'fs';
+import { Result } from '../../types/result';
+import { DatabaseError } from '../../types/errors';
+import { tableSchemas, documentsFTSSchema, thoughtsFTSSchema } from './schema';
 
 export class DatabaseConnection {
   private db: Database.Database | null = null;
-  private readonly config: DatabaseConfig;
+  private readonly dbPath: string;
 
-  constructor(config: DatabaseConfig) {
-    this.config = {
-      walMode: true,
-      foreignKeys: true,
-      busyTimeout: 5000,
-      ...config
-    };
+  constructor(dbPath?: string) {
+    this.dbPath = dbPath || this.getDefaultDbPath();
   }
 
-  /**
-   * Open database connection and initialize schema
-   */
-  async open(): Promise<Result<void, Error>> {
+  private getDefaultDbPath(): string {
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+    const configDir = path.join(homeDir, '.mcp-pif');
+    
+    // Ensure config directory exists
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    
+    return path.join(configDir, 'mcp-pif.db');
+  }
+
+  async connect(): Promise<Result<void>> {
     try {
-      // Ensure database directory exists
-      const dbDir = path.dirname(this.config.path);
-      const dirResult = await ensureDirectory(dbDir);
-      if (!dirResult.ok) {
-        return Result.err(new Error(`Failed to create database directory: ${dbDir}: ${dirResult.error}`));
+      if (this.db) {
+        return Result.ok(undefined);
       }
 
-      // Open database
-      this.db = new Database(this.config.path);
-
-      // Configure database
-      if (this.config.walMode) {
-        this.db.pragma('journal_mode = WAL');
-      }
-      if (this.config.foreignKeys) {
-        this.db.pragma('foreign_keys = ON');
-      }
-      this.db.pragma(`busy_timeout = ${this.config.busyTimeout}`);
-
+      this.db = new Database(this.dbPath);
+      
+      // Enable foreign keys
+      this.db.pragma('foreign_keys = ON');
+      
+      // Set journal mode to WAL for better concurrency
+      this.db.pragma('journal_mode = WAL');
+      
       // Initialize schema
-      this.db.exec(CREATE_TABLES_SQL);
-
-      // Check and apply migrations
-      const migrationResult = this.checkAndApplyMigrations();
-      if (!migrationResult.ok) {
-        return migrationResult;
+      const schemaResult = await this.initializeSchema();
+      if (!schemaResult.ok) {
+        return schemaResult;
       }
 
       return Result.ok(undefined);
     } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
+      return Result.err(new DatabaseError('connect', error as Error));
     }
   }
 
-  /**
-   * Close database connection
-   */
-  close(): Result<void, Error> {
+  private async initializeSchema(): Promise<Result<void>> {
+    try {
+      if (!this.db) {
+        return Result.err(new DatabaseError('initializeSchema', new Error('Database not connected')));
+      }
+
+      // Create tables in dependency order
+      for (const schema of tableSchemas) {
+        this.db.exec(schema.sql);
+        
+        // Create indexes
+        for (const indexSql of schema.indexes) {
+          this.db.exec(indexSql);
+        }
+      }
+
+      // Create FTS tables
+      this.db.exec(documentsFTSSchema);
+      this.db.exec(thoughtsFTSSchema);
+
+      return Result.ok(undefined);
+    } catch (error) {
+      return Result.err(new DatabaseError('initializeSchema', error as Error));
+    }
+  }
+
+  async disconnect(): Promise<Result<void>> {
     try {
       if (this.db) {
         this.db.close();
@@ -80,249 +85,49 @@ export class DatabaseConnection {
       }
       return Result.ok(undefined);
     } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
+      return Result.err(new DatabaseError('disconnect', error as Error));
     }
   }
 
-  /**
-   * Check if database is open
-   */
-  isOpen(): boolean {
+  getDatabase(): Database.Database | null {
+    return this.db;
+  }
+
+  isConnected(): boolean {
     return this.db !== null && this.db.open;
   }
 
-  /**
-   * Get the underlying database instance (for advanced operations)
-   */
-  getDatabase(): Result<Database.Database, Error> {
-    if (!this.db || !this.db.open) {
-      return Result.err(new Error('Database not open'));
-    }
-    return Result.ok(this.db);
-  }
-
-  /**
-   * Execute a transaction
-   */
-  transaction<T>(fn: (db: Database.Database) => T): Result<T, Error> {
-    const dbResult = this.getDatabase();
-    if (!dbResult.ok) {
-      return dbResult;
+  // Transaction helper
+  async transaction<T>(
+    fn: (db: Database.Database) => T
+  ): Promise<Result<T>> {
+    if (!this.db) {
+      return Result.err(new DatabaseError('transaction', new Error('Database not connected')));
     }
 
     try {
-      const result = dbResult.value.transaction(fn)(dbResult.value);
+      const result = this.db.transaction(fn)(this.db);
       return Result.ok(result);
     } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
+      return Result.err(new DatabaseError('transaction', error as Error));
     }
   }
 
-  /**
-   * Check and apply migrations
-   */
-  private checkAndApplyMigrations(): Result<void, Error> {
+  // Prepared statement helper
+  prepare<T extends any[] = any[]>(sql: string): Database.Statement<T> | null {
     if (!this.db) {
-      return Result.err(new Error('Database not open'));
+      return null;
     }
-
-    try {
-      // Check if migrations table has any entries
-      const count = this.db
-        .prepare('SELECT COUNT(*) as count FROM migrations')
-        .get() as { count: number };
-
-      if (count.count === 0) {
-        // No migrations applied yet, apply initial migration
-        this.db.prepare(INITIAL_MIGRATION_SQL).run(SCHEMA_VERSION, 'initial_schema');
-      } else {
-        // Check current schema version
-        const currentVersion = this.db
-          .prepare('SELECT MAX(id) as version FROM migrations')
-          .get() as { version: number };
-
-        if (currentVersion.version < SCHEMA_VERSION) {
-          // Apply new migrations here in the future
-          // For now, we only have the initial migration
-        }
-      }
-
-      return Result.ok(undefined);
-    } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
-    }
-  }
-
-  // Project operations
-
-  /**
-   * Create a new project
-   */
-  createProject(project: Omit<ProjectRecord, 'created_at'>): Result<ProjectRecord, Error> {
-    const dbResult = this.getDatabase();
-    if (!dbResult.ok) return dbResult;
-
-    try {
-      const stmt = dbResult.value.prepare(`
-        INSERT INTO projects (id, alias, name, root_path, is_open, last_opened, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      stmt.run(
-        project.id,
-        project.alias,
-        project.name,
-        project.root_path,
-        project.is_open ? 1 : 0,
-        project.last_opened,
-        project.metadata
-      );
-
-      // Fetch and return the created project
-      return this.getProject(project.id);
-    } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
-    }
-  }
-
-  /**
-   * Get a project by ID
-   */
-  getProject(id: string): Result<ProjectRecord, Error> {
-    const dbResult = this.getDatabase();
-    if (!dbResult.ok) return dbResult;
-
-    try {
-      const project = dbResult.value
-        .prepare('SELECT * FROM projects WHERE id = ?')
-        .get(id) as ProjectRecord | undefined;
-
-      if (!project) {
-        return Result.err(new Error(`Project not found: ${id}`));
-      }
-
-      // Convert SQLite integer to boolean
-      project.is_open = Boolean(project.is_open);
-
-      return Result.ok(project);
-    } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
-    }
-  }
-
-  /**
-   * Get a project by alias
-   */
-  getProjectByAlias(alias: string): Result<ProjectRecord, Error> {
-    const dbResult = this.getDatabase();
-    if (!dbResult.ok) return dbResult;
-
-    try {
-      const project = dbResult.value
-        .prepare('SELECT * FROM projects WHERE alias = ?')
-        .get(alias) as ProjectRecord | undefined;
-
-      if (!project) {
-        return Result.err(new Error(`Project not found: ${alias}`));
-      }
-
-      // Convert SQLite integer to boolean
-      project.is_open = Boolean(project.is_open);
-
-      return Result.ok(project);
-    } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
-    }
-  }
-
-  /**
-   * List all projects
-   */
-  listProjects(filter?: { is_open?: boolean }): Result<ProjectRecord[], Error> {
-    const dbResult = this.getDatabase();
-    if (!dbResult.ok) return dbResult;
-
-    try {
-      let query = 'SELECT * FROM projects';
-      const params: any[] = [];
-
-      if (filter?.is_open !== undefined) {
-        query += ' WHERE is_open = ?';
-        params.push(filter.is_open ? 1 : 0);
-      }
-
-      query += ' ORDER BY name ASC';
-
-      const projects = dbResult.value
-        .prepare(query)
-        .all(...params) as ProjectRecord[];
-
-      // Convert SQLite integers to booleans
-      projects.forEach(project => {
-        project.is_open = Boolean(project.is_open);
-      });
-
-      return Result.ok(projects);
-    } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
-    }
-  }
-
-  /**
-   * Update project open status
-   */
-  updateProjectOpenStatus(id: string, isOpen: boolean): Result<void, Error> {
-    const dbResult = this.getDatabase();
-    if (!dbResult.ok) return dbResult;
-
-    try {
-      const stmt = dbResult.value.prepare(`
-        UPDATE projects
-        SET is_open = ?, last_opened = ?
-        WHERE id = ?
-      `);
-
-      const result = stmt.run(
-        isOpen ? 1 : 0,
-        isOpen ? new Date().toISOString() : null,
-        id
-      );
-
-      if (result.changes === 0) {
-        return Result.err(new Error(`Project not found: ${id}`));
-      }
-
-      return Result.ok(undefined);
-    } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
-    }
-  }
-
-  /**
-   * Delete a project
-   */
-  deleteProject(id: string): Result<void, Error> {
-    const dbResult = this.getDatabase();
-    if (!dbResult.ok) return dbResult;
-
-    try {
-      const stmt = dbResult.value.prepare('DELETE FROM projects WHERE id = ?');
-      const result = stmt.run(id);
-
-      if (result.changes === 0) {
-        return Result.err(new Error(`Project not found: ${id}`));
-      }
-
-      return Result.ok(undefined);
-    } catch (error) {
-      return Result.err(error instanceof Error ? error : new Error(String(error)));
-    }
+    return this.db.prepare<T>(sql);
   }
 }
 
-/**
- * Create a new database connection
- */
-export function createDatabaseConnection(config: DatabaseConfig): DatabaseConnection {
-  return new DatabaseConnection(config);
+// Singleton instance
+let instance: DatabaseConnection | null = null;
+
+export function getDatabaseConnection(dbPath?: string): DatabaseConnection {
+  if (!instance) {
+    instance = new DatabaseConnection(dbPath);
+  }
+  return instance;
 }

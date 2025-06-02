@@ -1,69 +1,116 @@
-# MCP-PIF v3 - Personal Intelligence Framework
+# MCP-PIF (Model Context Protocol - Personal Information Framework)
 
-A Model Context Protocol server with project-based file system access control and knowledge management capabilities.
+A personal knowledge management system with intelligent search, code analysis, and thought tracking.
 
-## Quick Start
+## 🚀 Quick Start
+
+### One-Command Setup & Start
+```bash
+# First time setup
+./start-pif.sh --setup
+
+# Start the system
+./start-pif.sh
+```
+
+That's it! The script will:
+- ✅ Start the ML service 
+- ✅ Initialize the database
+- ✅ Verify connectivity
+- ✅ Show you the welcome message
+
+### Alternative Methods
+
+**Using Make:**
+```bash
+make setup    # First time only
+make start    # Start everything
+```
+
+**Using NPM:**
+```bash
+npm run setup  # First time only
+npm start      # Start everything
+```
+
+**Manual (if you prefer control):**
+```bash
+# Terminal 1: Start ML service
+cd ml_module && source venv/bin/activate && python server.py
+
+# Terminal 2: Initialize system
+pif system init --ml-url http://127.0.0.1:8002
+```
+
+## 📋 Usage
+
+Once started, try these commands:
 
 ```bash
-# Install dependencies
-npm install
+# Add a project
+pif project add myproject /path/to/your/code
 
-# Build the project
-npm run build
-# or
-./build.sh
+# Search across your codebase
+pif search "authentication function"
 
-# Run the interactive server
-npm start
-# or
-./dist/index.js
+# List projects
+pif project list
 
-# Run tests
-npm run dev test/integration.test.ts
+# Get system status
+pif system health
 ```
 
-## Interactive Commands
+## 🛠 Development
 
-### Project Management
-- `new <alias> <path> [name]` - Create a new project
-- `open <alias>` - Open a project (make it accessible)
-- `close <alias>` - Close a project
-- `list [--open]` - List all projects
-- `remove <alias>` - Remove a project
+```bash
+# Development mode (auto-reload)
+./start-pif.sh --dev
 
-### System
-- `status` - Show server status
-- `help [command]` - Show help
-- `clear` - Clear screen
-- `exit` - Exit the server
+# Stop all services
+./start-pif.sh --stop
 
-## Architecture
-
-```
-┌─────────────────────────────────────┐
-│         MCP Handlers                │ <- User-facing, encoding/decoding
-├─────────────────────────────────────┤
-│         Domain Layer                │ <- Business logic, validation
-├─────────────────────────────────────┤
-│     Data Access Layer (DAL)         │ <- Pure functions, type-safe
-├─────────────────────────────────────┤
-│         Storage Layer               │ <- SQLite, filesystem
-└─────────────────────────────────────┘
+# Check what's running
+make help
 ```
 
-## Security Model
+## 🏗 Architecture
 
-- Projects define access boundaries
-- Only paths within open projects are accessible
-- Simple mental model: "open project = accessible paths"
+- **TypeScript CLI**: Command interface and service orchestration
+- **Python ML Module**: Code parsing, embeddings, and semantic search
+- **SQLite Database**: Fast local storage for metadata
+- **Neo4j (Optional)**: Graph relationships (falls back gracefully)
 
-## Database
+## 📦 Dependencies
 
-SQLite database stored at `~/.pif/pif.db` by default.
+- Node.js 18+
+- Python 3.8+
+- pip/npm for package management
 
-## Next Steps
+## 🔧 Configuration
 
-1. Add MCP handlers for Claude integration
-2. Implement advanced search with embeddings
-3. Add journaling and reasoning tools
-4. Build knowledge graph features
+Edit `ml_module/.env` to customize:
+- ML service port
+- Neo4j connection (optional)
+- Embedding model
+- File watching settings
+
+## 🚫 Troubleshooting
+
+**Port conflicts?**
+```bash
+./start-pif.sh --stop  # Stop everything
+# Edit ml_module/.env to change ML_PORT
+```
+
+**Python issues?**
+```bash
+cd ml_module
+rm -rf venv
+./start-pif.sh --setup  # Recreate environment
+```
+
+**Need help?**
+```bash
+./start-pif.sh --help
+pif --help
+```
