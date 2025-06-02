@@ -1,70 +1,74 @@
 {
   "name": "mcp-pif",
-  "version": "3.0.0",
-  "description": "Personal Intelligence Framework - MCP Server",
+  "version": "0.1.0",
+  "description": "Model Context Protocol - Personal Information Framework",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
-    "pif": "dist/index.js"
+    "pif": "./dist/cli/index.js"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
     "clean": "rm -rf dist",
+    "dev": "tsx watch src/server/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:integration": "ts-node test/integration.test.ts",
-    "start:all": "./start-all.sh",
-    "start:dev": "node start-dev.js",
-    "start:interactive": "./start-interactive.sh",
-    "ml:setup": "cd src/ml_module && ./setup.sh",
-    "ml:start": "cd src/ml_module && ./run.sh"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "roots": [
-      "<rootDir>/src"
-    ],
-    "testMatch": [
-      "**/__tests__/**/*.test.ts"
-    ],
-    "collectCoverageFrom": [
-      "src/**/*.ts",
-      "!src/**/*.d.ts",
-      "!src/index.ts"
-    ]
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "axios": "^1.6.2",
-    "better-sqlite3": "^9.0.0",
-    "glob": "^10.3.10",
-    "mime-types": "^2.1.35",
-    "uuid": "^9.0.0"
-  },
-  "devDependencies": {
-    "@types/axios": "^0.14.0",
-    "@types/better-sqlite3": "^7.6.0",
-    "@types/glob": "^8.1.0",
-    "@types/jest": "^29.5.14",
-    "@types/mime-types": "^2.1.1",
-    "@types/node": "^20.0.0",
-    "@types/uuid": "^9.0.0",
-    "jest": "^29.0.0",
-    "ts-jest": "^29.3.4",
-    "ts-node": "^10.9.0",
-    "typescript": "^5.0.0"
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build",
+    "mcp:start": "node dist/server/index.js",
+    "ml:setup": "cd ml_module && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt",
+    "ml:start": "cd ml_module && source venv/bin/activate && python server.py",
+    "ml:dev": "cd ml_module && source venv/bin/activate && ML_DEBUG=true python server.py",
+    "setup": "npm install && npm run ml:setup",
+    "start": "npm run build && concurrently \"npm run ml:start\" \"sleep 3 && pif system init --ml-url http://127.0.0.1:8002\"",
+    "pif:init": "pif system init --ml-url http://127.0.0.1:8002"
   },
   "keywords": [
     "mcp",
-    "ai",
-    "knowledge-management"
+    "model-context-protocol",
+    "knowledge-management",
+    "personal-information"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.1",
+    "@types/uuid": "^10.0.0",
+    "better-sqlite3": "^11.3.0",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "cosmiconfig": "^9.0.0",
+    "dotenv": "^16.4.5",
+    "hash-sum": "^2.0.0",
+    "minimatch": "^9.0.3",
+    "ora": "^5.4.1",
+    "p-queue": "^8.0.1",
+    "uuid": "^11.1.0",
+    "winston": "^3.13.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/jest": "^29.5.12",
+    "@types/minimatch": "^5.1.2",
+    "@types/node": "^20.14.11",
+    "@typescript-eslint/eslint-plugin": "^7.16.1",
+    "@typescript-eslint/parser": "^7.16.1",
+    "concurrently": "^9.1.2",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.5",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

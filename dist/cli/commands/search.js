@@ -1,98 +1,106 @@
 "use strict";
-/**
- * Search commands
- */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchCommands = exports.SearchCommand = void 0;
-const types_1 = require("../types");
-const dal_1 = require("../../dal");
-class SearchCommand {
-    name = 'search';
-    aliases = ['s', 'find', 'f'];
-    description = 'Search for documents';
-    usage = 'search <query> [--project <alias>] [--semantic]';
-    category = types_1.CommandCategory.SEARCH;
-    async execute(args, context) {
-        if (args.length === 0) {
-            return dal_1.Result.ok({
-                message: 'Usage: search <query> [--project <alias>] [--semantic]',
-                type: 'error'
-            });
+exports.searchCommand = void 0;
+const router_1 = require("../router");
+const result_1 = require("../../types/result");
+exports.searchCommand = (0, router_1.defineCommand)({
+    name: 'search',
+    description: 'Search documents and code',
+    aliases: ['s'],
+    arguments: [
+        { name: 'query', description: 'Search query', required: true, variadic: true }
+    ],
+    options: [
+        { name: 'type', alias: 't', type: 'string', description: 'Search type (semantic, literal, hybrid)', default: 'hybrid' },
+        { name: 'limit', alias: 'l', type: 'number', description: 'Maximum results', default: 20 },
+        { name: 'project', alias: 'p', type: 'string', description: 'Search specific project (alias)' }
+    ],
+    execute: async (args, options, context) => {
+        // Join variadic query arguments
+        const query = args.query.join(' ');
+        if (!query.trim()) {
+            return result_1.Result.err(new Error('Search query cannot be empty'));
         }
+        const spinner = context.output.spinner('Searching...');
         try {
-            // Parse arguments
-            const projectIndex = args.indexOf('--project');
-            const useSemanticSearch = args.includes('--semantic');
-            let projectAlias;
-            if (projectIndex !== -1 && projectIndex < args.length - 1) {
-                projectAlias = args[projectIndex + 1];
-            }
-            // Extract query (everything except flags)
-            const query = args.filter((arg, i) => !arg.startsWith('--') &&
-                !(projectIndex !== -1 && i === projectIndex + 1)).join(' ');
-            if (!query) {
-                return dal_1.Result.ok({
-                    message: 'Please provide a search query',
-                    type: 'error'
-                });
-            }
-            // Get project ID if alias provided
-            let projectId;
-            if (projectAlias) {
-                const projectResult = await context.services.projectService.getProject(projectAlias);
+            const projectService = await context.services.project();
+            const mlClient = context.services.ml();
+            // Determine which projects to search
+            let projectIds = [];
+            if (options.project) {
+                // Search specific project
+                const dal = await context.services.dal();
+                const projectResult = await dal.projects.findByAlias(options.project);
                 if (!projectResult.ok) {
-                    return dal_1.Result.ok({
-                        message: `Project not found: ${projectAlias}`,
-                        type: 'error'
-                    });
+                    spinner.stop();
+                    return projectResult;
                 }
-                projectId = projectResult.value.id;
+                if (!projectResult.value) {
+                    spinner.stop();
+                    return result_1.Result.err(new Error(`Project '${options.project}' not found`));
+                }
+                projectIds = [projectResult.value.id];
+            }
+            else {
+                // Use active project if available
+                const activeResult = await projectService.getActiveProject();
+                if (activeResult.ok && activeResult.value) {
+                    projectIds = [activeResult.value.id];
+                }
             }
             // Perform search
-            console.log(`🔍 Searching for: "${query}"${useSemanticSearch ? ' (semantic)' : ''}...`);
-            const searchResult = await context.services.documentService.searchDocuments(query, {
-                projectIds: projectId ? [projectId] : undefined,
-                limit: 10,
-                useSemanticSearch
+            const searchResult = await mlClient.search({
+                query,
+                projectIds,
+                limit: options.limit,
+                searchType: options.type
             });
+            spinner.stop();
             if (!searchResult.ok) {
-                return dal_1.Result.ok({
-                    message: `Search failed: ${searchResult.error.error.details}`,
-                    type: 'error'
-                });
+                return searchResult;
             }
-            if (searchResult.value.length === 0) {
-                return dal_1.Result.ok({
-                    message: 'No documents found',
-                    type: 'info'
-                });
+            const response = searchResult.value;
+            if (response.results.length === 0) {
+                context.output.log('No results found');
+                return result_1.Result.ok(undefined);
             }
-            let message = `📄 Found ${searchResult.value.length} document${searchResult.value.length > 1 ? 's' : ''}:\n\n`;
-            for (const result of searchResult.value) {
-                const path = require('path');
-                const fileName = path.basename(result.document.path);
-                const dirName = path.dirname(result.document.path);
-                const score = result.score.toFixed(3);
-                message += `  ${fileName} (score: ${score})\n`;
-                message += `    📁 ${dirName}\n`;
-                if (result.highlights.length > 0) {
-                    message += `    📝 ${result.highlights[0]}\n`;
+            // Display results
+            if (context.config.format === 'json') {
+                context.output.json(response);
+            }
+            else {
+                context.output.log(`\nFound ${response.totalResults} results (showing ${response.results.length}):`);
+                context.output.log(`Search time: ${response.searchTimeMs}ms\n`);
+                response.results.forEach((result, i) => {
+                    context.output.log(`${i + 1}. ${result.title}`);
+                    if (result.path) {
+                        context.output.log(`   Path: ${result.path}`);
+                    }
+                    context.output.log(`   Score: ${result.score.toFixed(3)}`);
+                    context.output.log(`   Type: ${result.type}`);
+                    // Show snippet or highlights
+                    if (result.highlights && result.highlights.length > 0) {
+                        context.output.log(`   Matches:`);
+                        result.highlights.forEach(h => {
+                            context.output.log(`     ...${h}...`);
+                        });
+                    }
+                    else if (result.content) {
+                        const preview = result.content.substring(0, 200);
+                        context.output.log(`   Preview: ${preview}${result.content.length > 200 ? '...' : ''}`);
+                    }
+                    context.output.log('');
+                });
+                if (response.suggestions && response.suggestions.length > 0) {
+                    context.output.log('Did you mean:');
+                    response.suggestions.forEach(s => context.output.log(`  - ${s}`));
                 }
-                message += '\n';
             }
-            return dal_1.Result.ok({
-                message,
-                type: 'success',
-                data: searchResult.value
-            });
+            return result_1.Result.ok(undefined);
         }
-        catch (error) {
-            return dal_1.Result.err(error instanceof Error ? error : new Error(String(error)));
+        finally {
+            spinner.stop();
         }
     }
-}
-exports.SearchCommand = SearchCommand;
-exports.searchCommands = [
-    new SearchCommand()
-];
+});
 //# sourceMappingURL=search.js.map

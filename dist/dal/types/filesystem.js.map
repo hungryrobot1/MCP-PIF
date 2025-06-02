@@ -1,1 +1,0 @@
-{"version":3,"file":"filesystem.js","sourceRoot":"","sources":["../../../src/dal/types/filesystem.ts"],"names":[],"mappings":";AAAA;;GAEG;;;AAmEH;;GAEG;AACU,QAAA,cAAc,GAAG;IAC5B,aAAa,EAAE,GAAG,GAAG,IAAI,GAAG,IAAI,EAAE,oBAAoB;IACtD,eAAe,EAAE,IAAI,EAAa,oBAAoB;IACtD,WAAW,EAAE,EAAE,GAAG,IAAI,EAAY,4BAA4B;CACtD,CAAC"}
