@@ -299,7 +299,7 @@ async def health():
         uptime = time.time() - start_time
         
         return HealthStatus(
-            healthy=neo4j_connected,
+            healthy=True,  # Service is healthy even without Neo4j
             version="0.1.0",
             neo4j_connected=neo4j_connected,
             active_watchers=active_watchers,

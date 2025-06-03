@@ -10,6 +10,26 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 async function main() {
+  const args = process.argv.slice(2);
+  
+  // Show help if no arguments
+  if (args.length === 0) {
+    console.log('MCP-PIF Command Line Interface\n');
+    console.log('Usage: pif <command> [options]\n');
+    console.log('Commands:');
+    console.log('  project add <name> <path>     Add a new project');
+    console.log('  project list                  List all projects');
+    console.log('  project activate <alias>      Activate a project');
+    console.log('  project current               Show current project');
+    console.log('  search <query>                Search in active project');
+    console.log('  system health                 Check system status');
+    console.log('  system init                   Initialize system');
+    console.log('\nFor detailed help on a command:');
+    console.log('  pif <command> --help');
+    process.exit(0);
+  }
+  
+  // Run in command mode
   const router = new CommandRouter();
   
   // Register commands

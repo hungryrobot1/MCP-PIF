@@ -4,74 +4,130 @@ A personal knowledge management system with intelligent search, code analysis, a
 
 ## 🚀 Quick Start
 
-### One-Command Setup & Start
+### Setup (First Time Only)
 ```bash
-# First time setup
-./start-pif.sh --setup
+# Install Node.js dependencies
+npm install
 
-# Start the system
-./start-pif.sh
+# Setup Python ML module
+cd ml_module
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cd ..
 ```
 
-That's it! The script will:
-- ✅ Start the ML service 
-- ✅ Initialize the database
-- ✅ Verify connectivity
-- ✅ Show you the welcome message
-
-### Alternative Methods
-
-**Using Make:**
+### Start the ML Service
 ```bash
-make setup    # First time only
-make start    # Start everything
-```
+# Start the ML service
+npm start           # Production mode - clean output
+npm run start:dev   # Development mode - shows ML logs
 
-**Using NPM:**
-```bash
-npm run setup  # First time only
-npm start      # Start everything
-```
+# The service will:
+# - Build the project automatically
+# - Start the ML service
+# - Display usage instructions
 
-**Manual (if you prefer control):**
-```bash
-# Terminal 1: Start ML service
-cd ml_module && source venv/bin/activate && python server.py
+# In a new terminal, set the ML service URL:
+export ML_SERVICE_URL=http://127.0.0.1:8002
 
-# Terminal 2: Initialize system
-pif system init --ml-url http://127.0.0.1:8002
+# Stop the ML service
+npm run stop
 ```
 
 ## 📋 Usage
 
-Once started, try these commands:
+### Using the CLI
+
+With the ML service running and `ML_SERVICE_URL` exported, use the CLI commands:
 
 ```bash
-# Add a project
+# Using npm script shortcut
+npm run pif project add myproject /path/to/your/code
+npm run pif project list
+npm run pif search "authentication function"
+
+# Or using the CLI directly  
+./dist/cli/index.js project add myproject /path/to/your/code
+./dist/cli/index.js project list
+./dist/cli/index.js project activate myproject
+./dist/cli/index.js search "authentication function"
+./dist/cli/index.js system health
+
+# Or if you've linked globally (npm link)
 pif project add myproject /path/to/your/code
-
-# Search across your codebase
 pif search "authentication function"
-
-# List projects
-pif project list
-
-# Get system status
-pif system health
 ```
+
+### Example Workflow
+
+```bash
+# Terminal 1: Start ML service
+npm start
+
+# Terminal 2: Set environment and use CLI
+export ML_SERVICE_URL=http://127.0.0.1:8002
+
+# Check system health
+./dist/cli/index.js system health
+# ✓ Database: Connected
+# ✓ ML Service: Healthy
+
+# Add a project
+./dist/cli/index.js project add myproject ~/code/myproject
+# ✓ Project 'myproject' added with alias 'myproject'
+
+# Activate the project
+./dist/cli/index.js project activate myproject
+# ✓ Project 'myproject' activated
+
+# Search within the project
+./dist/cli/index.js search "database connection"
+# Found 3 results:
+# ...
+```
+
+### Available Commands
+
+- `project add <name> <path>` - Add a new project
+- `project list [--stats]` - List all projects  
+- `project activate <alias>` - Activate a project
+- `project current` - Show current active project
+- `project remove <alias>` - Remove a project
+- `search <query>` - Search in the active project
+- `system health` - Check system status
+- `system init` - Initialize the system
 
 ## 🛠 Development
 
 ```bash
-# Development mode (auto-reload)
-./start-pif.sh --dev
+# Development mode with ML logs visible
+npm run start:dev
 
 # Stop all services
-./start-pif.sh --stop
+npm run stop
 
-# Check what's running
-make help
+# Build project manually
+npm run build
+
+# Run tests
+npm test
+
+# Lint and type check
+npm run lint
+npm run typecheck
 ```
+
+### Available npm Scripts
+
+- `npm start` - Start in production mode (clean interface)
+- `npm run start:dev` - Start in development mode (shows ML logs)
+- `npm run stop` - Stop all services
+- `npm run build` - Build TypeScript to JavaScript
+- `npm run clean` - Clean build directory
+- `npm test` - Run tests
+- `npm run lint` - Lint TypeScript code
+- `npm run typecheck` - Type check without emitting
 
 ## 🏗 Architecture
 
@@ -88,29 +144,57 @@ make help
 
 ## 🔧 Configuration
 
-Edit `ml_module/.env` to customize:
-- ML service port
-- Neo4j connection (optional)
-- Embedding model
-- File watching settings
+**Environment Variables:**
+- Copy `ml_module/.env.example` to `ml_module/.env`
+- Customize ML service port, Neo4j connection, embedding models
+
+**Key Settings:**
+- **ML Service Port**: Default 8002 (configurable in `ml_module/.env`)
+- **Database**: SQLite stored in `~/.mcp-pif/`
+- **Neo4j**: Optional, falls back gracefully if unavailable
 
 ## 🚫 Troubleshooting
 
 **Port conflicts?**
 ```bash
-./start-pif.sh --stop  # Stop everything
-# Edit ml_module/.env to change ML_PORT
+# Stop services
+npm run stop
+
+# Check what's using port 8002
+lsof -i :8002
+
+# Change port in ml_module/.env if needed
 ```
 
-**Python issues?**
+**ML Service won't start?**
 ```bash
+# Check system status
+./dist/cli/index.js system health
+
+# View ML logs in development mode
+npm run start:dev
+
+# Common fixes:
+rm -rf ml_module/__pycache__  # Clear Python cache
+cd ml_module && pip install -r requirements.txt  # Reinstall dependencies
+```
+
+**Python virtual environment issues?**
+```bash
+# Recreate the virtual environment
 cd ml_module
 rm -rf venv
-./start-pif.sh --setup  # Recreate environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-**Need help?**
+**Build issues?**
 ```bash
-./start-pif.sh --help
-pif --help
+# Clean and rebuild
+npm run clean
+npm run build
+
+# Check TypeScript errors
+npm run typecheck
 ```

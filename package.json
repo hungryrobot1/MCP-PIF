@@ -22,12 +22,11 @@
     "typecheck": "tsc --noEmit",
     "prepare": "npm run build",
     "mcp:start": "node dist/server/index.js",
-    "ml:setup": "cd ml_module && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt",
-    "ml:start": "cd ml_module && source venv/bin/activate && python server.py",
-    "ml:dev": "cd ml_module && source venv/bin/activate && ML_DEBUG=true python server.py",
-    "setup": "npm install && npm run ml:setup",
-    "start": "npm run build && concurrently \"npm run ml:start\" \"sleep 3 && pif system init --ml-url http://127.0.0.1:8002\"",
-    "pif:init": "pif system init --ml-url http://127.0.0.1:8002"
+    "pif:init": "./dist/cli/index.js system init --ml-url http://127.0.0.1:8002",
+    "pif": "./dist/cli/index.js",
+    "start": "tsx src/scripts/startup.ts",
+    "start:dev": "tsx src/scripts/startup.ts dev",
+    "stop": "tsx src/scripts/startup.ts stop"
   },
   "keywords": [
     "mcp",
