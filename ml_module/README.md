@@ -47,7 +47,7 @@ Start the ML service:
 python -m server
 ```
 
-The service will be available at http://localhost:8000
+The service will be available at http://localhost:8002
 
 ## API Endpoints
 

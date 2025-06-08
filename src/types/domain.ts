@@ -193,6 +193,10 @@ export interface ProjectStatusResponse {
   pending_files: number;
   failed_files: number;
   last_indexed_at?: string;
+  entity_counts?: Record<string, number>;
+  relationship_count?: number;
+  last_indexed?: string;
+  last_modified?: string;
 }
 
 // Converter functions

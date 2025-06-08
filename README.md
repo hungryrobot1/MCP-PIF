@@ -8,193 +8,161 @@ A personal knowledge management system with intelligent search, code analysis, a
 ```bash
 # Install Node.js dependencies
 npm install
-
-# Setup Python ML module
-cd ml_module
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-cd ..
 ```
 
-### Start the ML Service
+That's it! The Python virtual environment and dependencies will be set up automatically when you start the application.
+
+### Start the Application
+
 ```bash
-# Start the ML service
-npm start           # Production mode - clean output
-npm run start:dev   # Development mode - shows ML logs
+# Start MCP-PIF in interactive mode
+npm start
 
-# The service will:
-# - Build the project automatically
-# - Start the ML service
-# - Display usage instructions
-
-# In a new terminal, set the ML service URL:
-export ML_SERVICE_URL=http://127.0.0.1:8002
-
-# Stop the ML service
-npm run stop
+# This will:
+# 1. Build the TypeScript project
+# 2. Set up Python venv automatically (if needed)
+# 3. Install Python dependencies (if needed)
+# 4. Start the ML service in the background
+# 5. Launch an interactive REPL
 ```
 
 ## 📋 Usage
 
-### Using the CLI
+### Interactive Mode (Recommended)
 
-With the ML service running and `ML_SERVICE_URL` exported, use the CLI commands:
+Once started, you'll see the interactive prompt:
 
-```bash
-# Using npm script shortcut
-npm run pif project add myproject /path/to/your/code
-npm run pif project list
-npm run pif search "authentication function"
+```
+╔═══════════════════════════════════════════╗
+║        MCP-PIF Interactive Mode           ║
+║   Personal Information Framework v1.0     ║
+╚═══════════════════════════════════════════╝
 
-# Or using the CLI directly  
-./dist/cli/index.js project add myproject /path/to/your/code
-./dist/cli/index.js project list
-./dist/cli/index.js project activate myproject
-./dist/cli/index.js search "authentication function"
-./dist/cli/index.js system health
+Type "help" for available commands
 
-# Or if you've linked globally (npm link)
-pif project add myproject /path/to/your/code
-pif search "authentication function"
+pif>
 ```
 
-### Example Workflow
+#### Commands
+
+All commands are now single words for easier typing:
 
 ```bash
-# Terminal 1: Start ML service
-npm start
+# Project Management
+add <name> <path>      # Add a new project
+list                   # List all projects
+activate <alias>       # Activate a project
+current                # Show current project
+remove <alias>         # Remove a project
 
-# Terminal 2: Set environment and use CLI
-export ML_SERVICE_URL=http://127.0.0.1:8002
+# Search & Analysis
+search <query>         # Search in active project
+
+# System
+health                 # Check system status
+init                   # Initialize system
+
+# REPL Commands
+help, ?                # Show help
+clear, cls             # Clear screen
+exit, quit             # Exit REPL
+```
+
+#### Example Session
+
+```bash
+pif> add myproject /path/to/your/code
+✓ Project 'myproject' added with alias 'myproject'
+
+pif> activate myproject
+✓ Project 'myproject' (myproject) is now active
+
+pif [myproject]> search "database connection"
+[Search results displayed here...]
+
+pif [myproject]> list
+┌─────────┬─────────┬─────────────────────┬────────┐
+│ Alias   │ Name    │ Path                │ Active │
+├─────────┼─────────┼─────────────────────┼────────┤
+│ myproject│ myproject│ /path/to/your/code │ ✓      │
+└─────────┴─────────┴─────────────────────┴────────┘
+
+pif [myproject]> exit
+Goodbye!
+```
+
+### CLI Mode
+
+You can also use MCP-PIF directly from the command line:
+
+```bash
+# Initialize the system
+pif init
+
+# Add and activate a project
+pif add myproject /path/to/your/code
+pif activate myproject
+
+# Search
+pif search "authentication logic"
+
+# List projects
+pif list
 
 # Check system health
-./dist/cli/index.js system health
-# ✓ Database: Connected
-# ✓ ML Service: Healthy
-
-# Add a project
-./dist/cli/index.js project add myproject ~/code/myproject
-# ✓ Project 'myproject' added with alias 'myproject'
-
-# Activate the project
-./dist/cli/index.js project activate myproject
-# ✓ Project 'myproject' activated
-
-# Search within the project
-./dist/cli/index.js search "database connection"
-# Found 3 results:
-# ...
+pif health
 ```
 
-### Available Commands
+### Tips
 
-- `project add <name> <path>` - Add a new project
-- `project list [--stats]` - List all projects  
-- `project activate <alias>` - Activate a project
-- `project current` - Show current active project
-- `project remove <alias>` - Remove a project
-- `search <query>` - Search in the active project
-- `system health` - Check system status
-- `system init` - Initialize the system
+- **Tab Completion**: Press Tab to autocomplete commands in interactive mode
+- **Active Project**: The active project appears in the prompt `pif [project]>`
+- **Quick Start**: Just run `npm start` - everything else is automatic
+- **Stop Services**: Run `npm stop` to stop the ML service
 
-## 🛠 Development
+## 🏗️ Architecture
+
+MCP-PIF consists of:
+
+1. **TypeScript CLI & MCP Server**: Handles user interaction and implements the Model Context Protocol
+2. **Python ML Service**: Provides intelligent search using embeddings and code analysis
+3. **SQLite Database**: Stores project metadata and thoughts
+4. **Neo4j (Optional)**: Graph database for advanced code relationship analysis
+
+## 🔧 Advanced Configuration
+
+### Environment Variables
+
+- `ML_SERVICE_URL`: ML service endpoint (default: `http://127.0.0.1:8002`)
+- `PIF_DB_PATH`: Database location (default: `~/.mcp-pif/mcp-pif.db`)
+- `PORT`: ML service port (default: `8002`)
+
+### Python ML Module
+
+The ML module configuration can be found in `ml_module/.env`:
+
+```env
+ML_PORT=8002
+ML_NEO4J_URI=bolt://localhost:7687
+ML_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+```
+
+## 🛠️ Development
 
 ```bash
-# Development mode with ML logs visible
-npm run start:dev
-
-# Stop all services
-npm run stop
-
-# Build project manually
-npm run build
+# Run TypeScript build in watch mode
+npm run dev
 
 # Run tests
 npm test
 
-# Lint and type check
+# Check types
+npm run typecheck
+
+# Lint code
 npm run lint
-npm run typecheck
 ```
 
-### Available npm Scripts
+## 📝 License
 
-- `npm start` - Start in production mode (clean interface)
-- `npm run start:dev` - Start in development mode (shows ML logs)
-- `npm run stop` - Stop all services
-- `npm run build` - Build TypeScript to JavaScript
-- `npm run clean` - Clean build directory
-- `npm test` - Run tests
-- `npm run lint` - Lint TypeScript code
-- `npm run typecheck` - Type check without emitting
-
-## 🏗 Architecture
-
-- **TypeScript CLI**: Command interface and service orchestration
-- **Python ML Module**: Code parsing, embeddings, and semantic search
-- **SQLite Database**: Fast local storage for metadata
-- **Neo4j (Optional)**: Graph relationships (falls back gracefully)
-
-## 📦 Dependencies
-
-- Node.js 18+
-- Python 3.8+
-- pip/npm for package management
-
-## 🔧 Configuration
-
-**Environment Variables:**
-- Copy `ml_module/.env.example` to `ml_module/.env`
-- Customize ML service port, Neo4j connection, embedding models
-
-**Key Settings:**
-- **ML Service Port**: Default 8002 (configurable in `ml_module/.env`)
-- **Database**: SQLite stored in `~/.mcp-pif/`
-- **Neo4j**: Optional, falls back gracefully if unavailable
-
-## 🚫 Troubleshooting
-
-**Port conflicts?**
-```bash
-# Stop services
-npm run stop
-
-# Check what's using port 8002
-lsof -i :8002
-
-# Change port in ml_module/.env if needed
-```
-
-**ML Service won't start?**
-```bash
-# Check system status
-./dist/cli/index.js system health
-
-# View ML logs in development mode
-npm run start:dev
-
-# Common fixes:
-rm -rf ml_module/__pycache__  # Clear Python cache
-cd ml_module && pip install -r requirements.txt  # Reinstall dependencies
-```
-
-**Python virtual environment issues?**
-```bash
-# Recreate the virtual environment
-cd ml_module
-rm -rf venv
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-**Build issues?**
-```bash
-# Clean and rebuild
-npm run clean
-npm run build
-
-# Check TypeScript errors
-npm run typecheck
-```
+MIT License - see LICENSE file for details.

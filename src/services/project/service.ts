@@ -496,4 +496,22 @@ export class ProjectService implements IProjectService {
     
     return Result.ok(isInProject);
   }
+
+  async getProjectByAlias(alias: string): Promise<Result<Project | null>> {
+    const connectResult = await this.ensureConnected();
+    if (!connectResult.ok) {
+      return connectResult as Result<Project | null>;
+    }
+
+    const projectResult = await this.dal.projects.findByAlias(alias);
+    if (!projectResult.ok) {
+      return projectResult as Result<Project | null>;
+    }
+
+    if (!projectResult.value) {
+      return Result.ok(null);
+    }
+
+    return Result.ok(projectRecordToProject(projectResult.value));
+  }
 }

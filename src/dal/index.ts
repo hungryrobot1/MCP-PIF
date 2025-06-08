@@ -2,7 +2,8 @@ import { DatabaseConnection, getDatabaseConnection } from './database/connection
 import { ProjectOperations } from './operations/projects';
 import { DocumentOperations } from './operations/documents';
 import { ThoughtOperations } from './operations/thoughts';
-import { IProjectOperations, IDocumentOperations, IThoughtOperations } from './operations/types';
+import { FileOperations } from './operations/filesystem';
+import { IProjectOperations, IDocumentOperations, IThoughtOperations, IFileOperations } from './operations/types';
 import { Result } from '../types/result';
 import { DatabaseError } from '../types/errors';
 
@@ -10,6 +11,7 @@ export interface DAL {
   projects: IProjectOperations;
   documents: IDocumentOperations;
   thoughts: IThoughtOperations;
+  filesystem: IFileOperations;
   connect(): Promise<Result<void>>;
   disconnect(): Promise<Result<void>>;
   isConnected(): boolean;
@@ -20,12 +22,14 @@ export class DataAccessLayer implements DAL {
   public readonly projects: IProjectOperations;
   public readonly documents: IDocumentOperations;
   public readonly thoughts: IThoughtOperations;
+  public readonly filesystem: IFileOperations;
 
   constructor(dbPath?: string) {
     this.db = getDatabaseConnection(dbPath);
     this.projects = new ProjectOperations(this.db);
     this.documents = new DocumentOperations(this.db);
     this.thoughts = new ThoughtOperations(this.db);
+    this.filesystem = new FileOperations();
   }
 
   async connect(): Promise<Result<void>> {

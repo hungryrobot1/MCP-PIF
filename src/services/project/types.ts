@@ -20,6 +20,7 @@ export interface IProjectService {
   // Utilities
   resolveProjectPath(relativePath: string): Promise<Result<string>>;
   isPathInActiveProject(absolutePath: string): Promise<Result<boolean>>;
+  getProjectByAlias(alias: string): Promise<Result<Project | null>>;
 }
 
 export interface ProjectInfo {
