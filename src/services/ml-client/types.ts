@@ -9,12 +9,30 @@ import {
   SearchResponse
 } from '../../types/domain';
 
+export interface IndexingStatus {
+  project_id: string;
+  status: 'idle' | 'scanning' | 'indexing' | 'completed' | 'error';
+  progress: {
+    total: number;
+    processed: number;
+    failed: number;
+    pending: number;
+    percentage: number;
+  };
+  current_file?: string;
+  started_at?: string;
+  completed_at?: string;
+  errors: string[];
+}
+
 export interface IMLClient {
   // Project Management
   registerProject(request: RegisterProjectRequest): Promise<Result<RegisterProjectResponse>>;
   unregisterProject(request: UnregisterProjectRequest): Promise<Result<{ success: boolean; message: string }>>;
   setActiveProject(request: SetActiveProjectRequest): Promise<Result<{ success: boolean; active_project_id?: string }>>;
   getProjectStatus(projectId: string): Promise<Result<ProjectStatusResponse>>;
+  getIndexingStatus(projectId: string): Promise<Result<IndexingStatus>>;
+  waitForIndexing(projectId: string, onProgress?: (status: IndexingStatus) => void, pollInterval?: number): Promise<Result<void>>;
   rescanProject(projectId: string): Promise<Result<{ success: boolean; message: string }>>;
 
   // Search

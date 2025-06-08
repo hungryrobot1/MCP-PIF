@@ -1,4 +1,4 @@
-import { IMLClient, MLHealthStatus, MLClientConfig } from './types';
+import { IMLClient, MLHealthStatus, MLClientConfig, IndexingStatus } from './types';
 import { Result } from '../../types/result';
 import {
   RegisterProjectRequest,
@@ -96,6 +96,34 @@ export class MLClient implements IMLClient {
     return this.request<ProjectStatusResponse>('GET', `/projects/${projectId}/status`);
   }
 
+  async getIndexingStatus(projectId: string): Promise<Result<IndexingStatus>> {
+    return this.request<IndexingStatus>('GET', `/projects/${projectId}/indexing-status`);
+  }
+
+  async waitForIndexing(
+    projectId: string, 
+    onProgress?: (status: IndexingStatus) => void,
+    pollInterval: number = 1000
+  ): Promise<Result<void>> {
+    while (true) {
+      const statusResult = await this.getIndexingStatus(projectId);
+      if (!statusResult.ok) return statusResult;
+      
+      const status = statusResult.value;
+      if (onProgress) onProgress(status);
+      
+      if (status.status === 'completed') {
+        return Result.ok(undefined);
+      }
+      
+      if (status.status === 'error') {
+        return Result.err(new Error(`Indexing failed: ${status.errors.join(', ')}`));
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+  }
+
   async rescanProject(projectId: string): Promise<Result<{ success: boolean; message: string }>> {
     return this.request('POST', `/projects/${projectId}/rescan`);
   }
@@ -118,7 +146,7 @@ let instance: IMLClient | null = null;
 let lastBaseUrl: string | null = null;
 
 export function getMLClient(config?: MLClientConfig): IMLClient {
-  const baseUrl = config?.baseUrl || process.env.ML_SERVICE_URL || 'http://localhost:8000';
+  const baseUrl = config?.baseUrl || process.env.ML_SERVICE_URL || 'http://localhost:8002';
   
   // Recreate instance if URL changed
   if (!instance || lastBaseUrl !== baseUrl) {

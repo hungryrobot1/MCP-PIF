@@ -20,40 +20,70 @@ class GraphStore:
         self.driver = None
         self.connected = False
         
-        # Try to connect, but don't fail if Neo4j is unavailable
-        try:
-            self.driver = GraphDatabase.driver(uri, auth=(user, password))
-            # Test the connection
-            with self.driver.session() as session:
-                session.run("RETURN 1")
-            self.connected = True
-            logger.info("Connected to Neo4j")
-        except Exception as e:
-            logger.warning(f"Neo4j not available: {e}")
-            logger.info("Running in fallback mode without graph storage")
-            self.driver = None
-            self.connected = False
-        
-    def close(self):
-        if self.driver:
-            self.driver.close()
-    
     def initialize_schema(self):
+        """Initialize Neo4j connection and schema with diagnostics"""
+        logger.info("Initializing GraphStore connection...")
+        
+        try:
+            from neo4j import GraphDatabase
+            logger.debug(f"Connecting to Neo4j at {self.uri}")
+            
+            self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
+            
+            # Test connection
+            with self.driver.session() as session:
+                result = session.run("RETURN 1 as test")
+                test_value = result.single()["test"]
+                logger.debug(f"Neo4j connection test returned: {test_value}")
+            
+            self.connected = True
+            logger.info("✓ Neo4j connected successfully")
+            
+            # Create constraints and indexes
+            self._create_schema()
+            
+        except ImportError as e:
+            logger.error(f"Neo4j driver not available: {e}")
+            logger.warning("Running in degraded mode - graph operations disabled")
+            self.connected = False
+        except Exception as e:
+            logger.warning(f"Neo4j connection failed: {e}")
+            logger.warning("Running in degraded mode - graph operations disabled")
+            logger.debug(f"Full error details: {type(e).__name__}: {e}")
+            self.connected = False
+    
+    def _create_schema(self):
         """Create indexes and constraints"""
         if not self.connected:
             logger.info("Skipping schema initialization - Neo4j not available")
             return
-            
+        
+        logger.info("Creating Neo4j schema...")
+        
         with self.driver.session() as session:
-            # Create indexes
-            session.run("CREATE INDEX IF NOT EXISTS FOR (f:File) ON (f.id)")
-            session.run("CREATE INDEX IF NOT EXISTS FOR (f:File) ON (f.project_id)")
-            session.run("CREATE INDEX IF NOT EXISTS FOR (e:Entity) ON (e.id)")
-            session.run("CREATE INDEX IF NOT EXISTS FOR (e:Entity) ON (e.name)")
-            session.run("CREATE INDEX IF NOT EXISTS FOR (e:Entity) ON (e.type)")
-            session.run("CREATE INDEX IF NOT EXISTS FOR (t:Thought) ON (t.id)")
+            # Create constraints for uniqueness
+            session.run("""
+                CREATE CONSTRAINT IF NOT EXISTS 
+                FOR (f:File) REQUIRE f.id IS UNIQUE
+            """)
+            session.run("""
+                CREATE CONSTRAINT IF NOT EXISTS 
+                FOR (e:Entity) REQUIRE e.id IS UNIQUE
+            """)
+            session.run("""
+                CREATE CONSTRAINT IF NOT EXISTS 
+                FOR (t:Thought) REQUIRE t.id IS UNIQUE
+            """)
             
-            # Create vector index for embeddings (Neo4j 5.x syntax)
+            # Create indexes for performance
+            session.run("CREATE INDEX IF NOT EXISTS FOR (f:File) ON (f.project_id)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (f:File) ON (f.path)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (e:Entity) ON (e.type)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (e:Entity) ON (e.name)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (e:Entity) ON (e.project_id)")
+            session.run("CREATE INDEX IF NOT EXISTS FOR (t:Thought) ON (t.project_id)")
+            
+            # Create vector indexes for embeddings (Neo4j 5.x syntax)
             try:
                 session.run("""
                     CREATE VECTOR INDEX entity_embeddings IF NOT EXISTS
@@ -63,8 +93,34 @@ class GraphStore:
                         `vector.similarity_function`: 'cosine'
                     }}
                 """, dim=self.embedder.embedding_dim or 384)
+                
+                session.run("""
+                    CREATE VECTOR INDEX file_embeddings IF NOT EXISTS
+                    FOR (f:File) ON (f.embedding)
+                    OPTIONS {indexConfig: {
+                        `vector.dimensions`: $dim,
+                        `vector.similarity_function`: 'cosine'
+                    }}
+                """, dim=self.embedder.embedding_dim or 384)
+                
+                session.run("""
+                    CREATE VECTOR INDEX thought_embeddings IF NOT EXISTS
+                    FOR (t:Thought) ON (t.embedding)
+                    OPTIONS {indexConfig: {
+                        `vector.dimensions`: $dim,
+                        `vector.similarity_function`: 'cosine'
+                    }}
+                """, dim=self.embedder.embedding_dim or 384)
             except Exception as e:
-                logger.warning(f"Could not create vector index: {e}")
+                logger.warning(f"Could not create vector indexes: {e}")
+        
+        logger.info("✓ Neo4j schema created successfully")
+    
+    def close(self):
+        """Close Neo4j connection"""
+        if self.driver:
+            self.driver.close()
+            logger.info("Neo4j connection closed")
     
     def _check_connection(self) -> bool:
         """Check if Neo4j is available and return True if operations should proceed"""
@@ -72,6 +128,110 @@ class GraphStore:
             logger.debug("Neo4j operation skipped - not connected")
             return False
         return True
+    
+    def create_file_node(self, file_data: dict) -> Optional[str]:
+        """Create file node if connected"""
+        if not self.connected:
+            logger.debug("Skipping file node creation - Neo4j not connected")
+            return None
+            
+        with self.driver.session() as session:
+            result = session.run("""
+                MERGE (f:File {path: $path, project_id: $project_id})
+                SET f.id = $id,
+                    f.content_hash = $content_hash,
+                    f.size = $size,
+                    f.language = $language,
+                    f.last_modified = $last_modified,
+                    f.embedding = $embedding,
+                    f.indexed_at = datetime()
+                RETURN f.id as id
+            """, **file_data)
+            
+            record = result.single()
+            return record['id'] if record else ""
+    
+    def create_entity_node(self, entity_data: dict, file_id: str) -> Optional[str]:
+        """Create entity node if connected"""
+        if not self.connected:
+            logger.debug("Skipping entity node creation - Neo4j not connected")
+            return None
+            
+        with self.driver.session() as session:
+            tx = session.begin_transaction()
+            try:
+                # Create entity
+                result = tx.run("""
+                    CREATE (e:Entity {
+                        id: $id,
+                        type: $type,
+                        name: $name,
+                        signature: $signature,
+                        start_line: $start_line,
+                        end_line: $end_line,
+                        content: $content,
+                        context: $context,
+                        language: $language,
+                        project_id: $project_id,
+                        embedding: $embedding
+                    })
+                    RETURN e.id as id
+                """, **entity_data)
+                
+                entity_id = result.single()['id']
+                
+                # Create (File)-[:CONTAINS]->(Entity) relationship
+                tx.run("""
+                    MATCH (f:File {id: $file_id})
+                    MATCH (e:Entity {id: $entity_id})
+                    CREATE (f)-[:CONTAINS]->(e)
+                """, file_id=file_id, entity_id=entity_id)
+                
+                tx.commit()
+                return entity_id
+                
+            except Exception as e:
+                tx.rollback()
+                logger.error(f"Failed to create entity node: {e}")
+                raise
+    
+    def create_code_relationship(self, from_id: str, rel_type: str, to_id: str):
+        """Create relationships like IMPORTS, EXTENDS, CALLS"""
+        if not self._check_connection():
+            return
+            
+        valid_relationships = ['IMPORTS', 'EXTENDS', 'IMPLEMENTS', 'CALLS', 'USES', 'REFERENCES']
+        if rel_type.upper() not in valid_relationships:
+            logger.warning(f"Invalid relationship type: {rel_type}")
+            return
+            
+        with self.driver.session() as session:
+            session.run(f"""
+                MATCH (s:Entity {{id: $from_id}})
+                MATCH (t:Entity {{id: $to_id}})
+                MERGE (s)-[:{rel_type.upper()}]->(t)
+            """, from_id=from_id, to_id=to_id)
+    
+    def create_thought_node(self, thought_data: dict) -> Optional[str]:
+        """Create thought node if connected"""
+        if not self.connected:
+            logger.debug("Skipping thought node creation - Neo4j not connected")
+            return None
+            
+        with self.driver.session() as session:
+            result = session.run("""
+                CREATE (t:Thought {
+                    id: $id,
+                    content: $content,
+                    project_id: $project_id,
+                    embedding: $embedding,
+                    created_at: datetime()
+                })
+                RETURN t.id as id
+            """, **thought_data)
+            
+            record = result.single()
+            return record['id'] if record else ""
     
     async def update_file(self, doc_id: str, file_path: str, project_id: str,
                          entities: List[CodeEntity], relationships: List[Relationship]):
@@ -276,3 +436,108 @@ class GraphStore:
                 ))
             
             return search_results
+    
+    def get_project_statistics(self, project_id: str) -> Dict[str, Any]:
+        """Get Neo4j statistics for a project"""
+        if not self.connected:
+            logger.debug("Skipping statistics query - Neo4j not connected")
+            return {}
+        
+        try:
+            with self.driver.session() as session:
+                # Get entity counts by type
+                entity_result = session.run("""
+                    MATCH (e:Entity {project_id: $project_id})
+                    RETURN e.type as entity_type, count(*) as count
+                    ORDER BY count DESC
+                """, project_id=project_id)
+                
+                entities = {}
+                total_entities = 0
+                for record in entity_result:
+                    entity_type = record['entity_type'] or 'unknown'
+                    count = record['count']
+                    entities[entity_type] = count
+                    total_entities += count
+                
+                # Get relationship count
+                rel_result = session.run("""
+                    MATCH (s:Entity {project_id: $project_id})-[r]->(t:Entity {project_id: $project_id})
+                    RETURN count(r) as relationship_count
+                """, project_id=project_id)
+                
+                relationship_count = rel_result.single()['relationship_count'] if rel_result.single() else 0
+                
+                # Get file count
+                file_result = session.run("""
+                    MATCH (f:File {project_id: $project_id})
+                    RETURN count(f) as file_count
+                """, project_id=project_id)
+                
+                file_count = file_result.single()['file_count'] if file_result.single() else 0
+                
+                return {
+                    'total_entities': total_entities,
+                    'entities_by_type': entities,
+                    'relationships': relationship_count,
+                    'indexed_files': file_count,
+                    'neo4j_available': True
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to get project statistics: {e}")
+            return {'neo4j_available': False, 'error': str(e)}
+
+    def store_project_metadata(self, project_id: str, metadata: dict):
+        """Store project indexing metadata in Neo4j"""
+        import json
+        from datetime import datetime
+        
+        with self.driver.session() as session:
+            session.run("""
+                MERGE (p:ProjectMetadata {project_id: $project_id})
+                SET p.last_indexed = $last_indexed,
+                    p.total_files = $total_files,
+                    p.indexed_files = $indexed_files,
+                    p.failed_files = $failed_files,
+                    p.pending_files = $pending_files,
+                    p.file_type_stats = $file_type_stats,
+                    p.indexing_status = $indexing_status,
+                    p.last_modified = timestamp(),
+                    p.updated_at = $updated_at
+            """, 
+            project_id=project_id,
+            last_indexed=metadata.get('last_indexed'),
+            total_files=metadata.get('total_files', 0),
+            indexed_files=metadata.get('indexed_files', 0),
+            failed_files=metadata.get('failed_files', 0),
+            pending_files=metadata.get('pending_files', 0),
+            file_type_stats=json.dumps(metadata.get('file_type_stats', {})),
+            indexing_status=metadata.get('indexing_status', 'unknown'),
+            updated_at=datetime.now().isoformat()
+        )
+
+    def get_project_metadata(self, project_id: str) -> dict:
+        """Retrieve project metadata from Neo4j"""
+        import json
+        
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (p:ProjectMetadata {project_id: $project_id})
+                RETURN p
+            """, project_id=project_id)
+            
+            record = result.single()
+            if record and record['p']:
+                node = record['p']
+                return {
+                    'last_indexed': node.get('last_indexed'),
+                    'total_files': node.get('total_files', 0),
+                    'indexed_files': node.get('indexed_files', 0),
+                    'failed_files': node.get('failed_files', 0),
+                    'pending_files': node.get('pending_files', 0),
+                    'file_type_stats': json.loads(node.get('file_type_stats', '{}')),
+                    'indexing_status': node.get('indexing_status', 'unknown'),
+                    'updated_at': node.get('updated_at')
+                }
+            return {}

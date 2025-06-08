@@ -1,81 +1,99 @@
 import os
+import logging
 from pathlib import Path
 from typing import Set, List
+
+logger = logging.getLogger(__name__)
 
 class FileFilter:
     """Determines which files should be indexed"""
     
     def __init__(self):
-        # Supported extensions for code files
-        self.code_extensions = {
-            '.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.c', '.h', '.hpp',
-            '.cs', '.rb', '.go', '.rs', '.swift', '.kt', '.scala', '.php', '.r',
-            '.m', '.mm', '.sh', '.bash', '.zsh', '.fish', '.ps1', '.lua', '.dart'
+        # Directories to skip
+        self.skip_dirs = {
+            'node_modules', '.git', '__pycache__', 'venv', '.venv',
+            'dist', 'build', '.next', 'coverage', '.pytest_cache',
+            '.tox', 'htmlcov', '.mypy_cache', '.ruff_cache',
+            '.svn', '.hg', '.bzr', '_darcs', 'env', '.env', 'virtualenv',
+            'target', 'out', 'bin', 'obj', '.idea', '.vscode', '.vs', '.eclipse',
+            '.coverage', '.nuxt', '.cache', '.parcel-cache',
+            'vendor', 'packages', 'bower_components'
         }
         
-        # Documentation and config files
-        self.doc_extensions = {
+        # File extensions to index
+        self.allowed_extensions = {
+            '.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cpp', '.c',
+            '.h', '.hpp', '.cs', '.rb', '.go', '.rs', '.swift', '.kt',
+            '.scala', '.php', '.r', '.m', '.mm', '.sql', '.sh', '.bash',
+            '.zsh', '.fish', '.ps1', '.lua', '.vim', '.el', '.dart',
             '.md', '.rst', '.txt', '.json', '.yaml', '.yml', '.toml', '.ini',
             '.xml', '.html', '.css', '.scss', '.sass', '.less'
         }
         
-        # All supported extensions
-        self.supported_extensions = self.code_extensions | self.doc_extensions
-        
-        # Directories to ignore
-        self.ignored_dirs = {
-            '.git', '.svn', '.hg', '.bzr', '_darcs',
-            'node_modules', '__pycache__', '.pytest_cache', '.mypy_cache',
-            'venv', 'env', '.env', 'virtualenv', '.venv',
-            'build', 'dist', 'target', 'out', 'bin', 'obj',
-            '.idea', '.vscode', '.vs', '.eclipse',
-            'coverage', '.coverage', 'htmlcov',
-            '.next', '.nuxt', '.cache', '.parcel-cache',
-            'vendor', 'packages', 'bower_components'
+        # Files to skip
+        self.skip_files = {
+            '.DS_Store', 'Thumbs.db', '.gitignore', '.dockerignore'
         }
         
         # File patterns to ignore
         self.ignored_patterns = {
             '*.min.js', '*.min.css', '*.map', '*.lock',
-            '*.log', '*.tmp', '*.temp', '*.bak', '*.swp',
-            '.DS_Store', 'Thumbs.db', 'desktop.ini'
+            '*.log', '*.tmp', '*.temp', '*.bak', '*.swp'
         }
     
     def should_index(self, file_path: str) -> bool:
-        """Check if a file should be indexed"""
+        """Determine if a file should be indexed"""
         path = Path(file_path)
         
-        # Check if file exists
-        if not path.exists() or not path.is_file():
-            return False
-        
-        # Check file size (skip very large files)
-        try:
-            if path.stat().st_size > 10 * 1024 * 1024:  # 10MB
-                return False
-        except:
-            return False
-        
-        # Check if in ignored directory
+        # Skip if in excluded directory
         for parent in path.parents:
-            if parent.name in self.ignored_dirs:
+            if parent.name in self.skip_dirs:
+                logger.debug(f"Skipping {file_path} - in excluded dir {parent.name}")
                 return False
         
-        # Check extension
-        if path.suffix.lower() not in self.supported_extensions:
+        # Skip specific files
+        if path.name in self.skip_files:
+            logger.debug(f"Skipping {file_path} - excluded file")
+            return False
+        
+        # Skip non-code files
+        if path.suffix.lower() not in self.allowed_extensions:
+            logger.debug(f"Skipping {file_path} - extension {path.suffix} not allowed")
+            return False
+        
+        # Skip compiled Python files
+        if path.suffix in ['.pyc', '.pyo']:
+            logger.debug(f"Skipping {file_path} - compiled Python")
             return False
         
         # Check ignored patterns
         for pattern in self.ignored_patterns:
             if path.match(pattern):
+                logger.debug(f"Skipping {file_path} - matches pattern {pattern}")
                 return False
         
+        # Check file size (skip very large files)
+        try:
+            if path.stat().st_size > 10 * 1024 * 1024:  # 10MB
+                logger.debug(f"Skipping {file_path} - file too large")
+                return False
+        except:
+            logger.debug(f"Skipping {file_path} - could not read file stats")
+            return False
+        
+        logger.debug(f"Indexing {file_path}")
         return True
     
     def is_code_file(self, file_path: str) -> bool:
         """Check if file is a code file (vs documentation)"""
         path = Path(file_path)
-        return path.suffix.lower() in self.code_extensions
+        code_extensions = {
+            '.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cpp', '.c',
+            '.h', '.hpp', '.cs', '.rb', '.go', '.rs', '.swift', '.kt',
+            '.scala', '.php', '.r', '.m', '.mm', '.sql', '.sh', '.bash',
+            '.zsh', '.fish', '.ps1', '.lua', '.vim', '.el', '.dart'
+        }
+        return path.suffix.lower() in code_extensions
     
     def get_language(self, file_path: str) -> str:
         """Get the programming language for a file"""

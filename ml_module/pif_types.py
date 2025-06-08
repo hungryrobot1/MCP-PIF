@@ -28,6 +28,10 @@ class ProjectStatusResponse(BaseModel):
     pending_files: int
     failed_files: int
     last_indexed_at: Optional[str] = None
+    entity_counts: Dict[str, int] = {}
+    relationship_count: int = 0
+    last_indexed: Optional[datetime] = None
+    last_modified: Optional[datetime] = None
 
 class SearchType(str, Enum):
     semantic = "semantic"

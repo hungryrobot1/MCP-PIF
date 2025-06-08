@@ -68,3 +68,19 @@ export interface IThoughtOperations {
   ): Promise<Result<ThoughtSearchResult[]>>;
   findUnindexed(limit?: number): Promise<Result<ThoughtRecord[]>>;
 }
+
+export interface FileStats {
+  path: string;
+  isDirectory: boolean;
+  size?: number;
+  modifiedAt?: Date;
+}
+
+export interface IFileOperations {
+  readFile(filePath: string): Promise<Result<string>>;
+  writeFile(filePath: string, content: string): Promise<Result<void>>;
+  deleteFile(filePath: string): Promise<Result<void>>;
+  listDirectory(dirPath: string): Promise<Result<FileStats[]>>;
+  exists(filePath: string): Promise<Result<boolean>>;
+  createDirectory(dirPath: string): Promise<Result<void>>;
+}
