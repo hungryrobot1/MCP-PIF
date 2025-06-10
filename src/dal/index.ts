@@ -6,12 +6,14 @@ import { FileOperations } from './operations/filesystem';
 import { IProjectOperations, IDocumentOperations, IThoughtOperations, IFileOperations } from './operations/types';
 import { Result } from '../types/result';
 import { DatabaseError } from '../types/errors';
+import { IMLClient, getMLClient } from './ml-client';
 
 export interface DAL {
   projects: IProjectOperations;
   documents: IDocumentOperations;
   thoughts: IThoughtOperations;
   filesystem: IFileOperations;
+  mlClient: IMLClient;
   connect(): Promise<Result<void>>;
   disconnect(): Promise<Result<void>>;
   isConnected(): boolean;
@@ -23,6 +25,11 @@ export class DataAccessLayer implements DAL {
   public readonly documents: IDocumentOperations;
   public readonly thoughts: IThoughtOperations;
   public readonly filesystem: IFileOperations;
+  public readonly mlClient: IMLClient;
+  
+  get database(): DatabaseConnection {
+    return this.db;
+  }
 
   constructor(dbPath?: string) {
     this.db = getDatabaseConnection(dbPath);
@@ -30,6 +37,7 @@ export class DataAccessLayer implements DAL {
     this.documents = new DocumentOperations(this.db);
     this.thoughts = new ThoughtOperations(this.db);
     this.filesystem = new FileOperations();
+    this.mlClient = getMLClient();
   }
 
   async connect(): Promise<Result<void>> {

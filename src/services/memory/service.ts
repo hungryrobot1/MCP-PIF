@@ -4,7 +4,7 @@ import {
   ServiceUnavailableError,
   NetworkError 
 } from '../../types/errors';
-import { getMLClient } from '../ml-client';
+import { getMLClient } from '../../dal/ml-client';
 import { 
   IMemoryService, 
   MemoryServiceConfig, 

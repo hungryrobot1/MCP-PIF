@@ -20,9 +20,6 @@ tree-sitter-python>=0.20.0
 tree-sitter-javascript>=0.20.0
 tree-sitter-typescript>=0.20.0
 
-# File watching
-watchdog>=3.0.0
-
 # Utilities
 httpx>=0.25.0
 python-multipart>=0.0.0

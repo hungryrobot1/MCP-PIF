@@ -14,7 +14,11 @@ export const projectsTableSchema: TableSchema = {
       name TEXT NOT NULL,
       root_path TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      settings TEXT NOT NULL DEFAULT '{}'
+      settings TEXT NOT NULL DEFAULT '{}',
+      indexed_files INTEGER DEFAULT 0,
+      total_entities INTEGER DEFAULT 0,
+      last_indexed_at TEXT,
+      indexing_status TEXT DEFAULT 'pending'
     )
   `,
   indexes: [
@@ -69,6 +73,28 @@ export const thoughtsTableSchema: TableSchema = {
   dependencies: ['projects']
 };
 
+export const fileIndexTableSchema: TableSchema = {
+  name: 'file_index',
+  sql: `
+    CREATE TABLE IF NOT EXISTS file_index (
+      project_id TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      file_size INTEGER NOT NULL,
+      entity_count INTEGER DEFAULT 0,
+      last_indexed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      
+      PRIMARY KEY (project_id, file_path),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+  `,
+  indexes: [
+    'CREATE INDEX IF NOT EXISTS idx_file_index_project ON file_index(project_id)',
+    'CREATE INDEX IF NOT EXISTS idx_file_index_hash ON file_index(content_hash)'
+  ],
+  dependencies: ['projects']
+};
+
 // FTS tables need to be created separately
 export const documentsFTSSchema = `
   CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
@@ -91,5 +117,6 @@ export const thoughtsFTSSchema = `
 export const tableSchemas = [
   projectsTableSchema,
   documentsTableSchema,
-  thoughtsTableSchema
+  thoughtsTableSchema,
+  fileIndexTableSchema
 ];

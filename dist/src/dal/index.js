@@ -23,18 +23,24 @@ const thoughts_1 = require("./operations/thoughts");
 const filesystem_1 = require("./operations/filesystem");
 const result_1 = require("../types/result");
 const errors_1 = require("../types/errors");
+const ml_client_1 = require("./ml-client");
 class DataAccessLayer {
     db;
     projects;
     documents;
     thoughts;
     filesystem;
+    mlClient;
+    get database() {
+        return this.db;
+    }
     constructor(dbPath) {
         this.db = (0, connection_1.getDatabaseConnection)(dbPath);
         this.projects = new projects_1.ProjectOperations(this.db);
         this.documents = new documents_1.DocumentOperations(this.db);
         this.thoughts = new thoughts_1.ThoughtOperations(this.db);
         this.filesystem = new filesystem_1.FileOperations();
+        this.mlClient = (0, ml_client_1.getMLClient)();
     }
     async connect() {
         return this.db.connect();

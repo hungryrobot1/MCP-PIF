@@ -541,3 +541,94 @@ class GraphStore:
                     'updated_at': node.get('updated_at')
                 }
             return {}
+    
+    def create_or_update_file_node(self, file_data: dict) -> str:
+        """Create or update a file node"""
+        if not self._check_connection():
+            return None
+            
+        with self.driver.session() as session:
+            result = session.run("""
+                MERGE (f:File {project_id: $project_id, path: $path})
+                SET f.size = $size,
+                    f.last_indexed = datetime()
+                RETURN id(f) as id
+            """, **file_data)
+            
+            record = result.single()
+            return str(record['id']) if record else None
+
+    def remove_file_entities(self, project_id: str, file_path: str):
+        """Remove all entities for a file"""
+        if not self._check_connection():
+            return
+            
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (f:File {project_id: $project_id, path: $path})
+                -[:CONTAINS]->(e:Entity)
+                DETACH DELETE e
+            """, project_id=project_id, path=file_path)
+    
+    def create_entity_node(self, entity: dict) -> str:
+        """Create an entity node with embedding"""
+        if not self._check_connection():
+            return None
+            
+        # Generate embedding
+        embedding = self.embedder.embed_code(
+            entity.get('content', ''), 
+            entity.get('language', 'text')
+        )
+        
+        with self.driver.session() as session:
+            result = session.run("""
+                CREATE (e:Entity {
+                    type: $type,
+                    name: $name,
+                    content: $content,
+                    start_line: $start_line,
+                    end_line: $end_line,
+                    metadata: $metadata,
+                    embedding: $embedding
+                })
+                RETURN id(e) as id
+            """, 
+            type=entity.get('type'),
+            name=entity.get('name'),
+            content=entity.get('content', ''),
+            start_line=entity.get('start_line', 0),
+            end_line=entity.get('end_line', 0),
+            metadata=json.dumps(entity.get('metadata', {})),
+            embedding=embedding.tolist()
+            )
+            
+            record = result.single()
+            return str(record['id']) if record else None
+    
+    def create_relationship(self, file_id: str, entity_id: str, rel_type: str):
+        """Create a relationship between file and entity"""
+        if not self._check_connection():
+            return
+            
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (f) WHERE id(f) = $file_id
+                MATCH (e) WHERE id(e) = $entity_id
+                CREATE (f)-[r:{}]->(e)
+            """.format(rel_type), file_id=int(file_id), entity_id=int(entity_id))
+    
+    def create_entity_relationship(self, relationship: dict):
+        """Create a relationship between entities"""
+        if not self._check_connection():
+            return
+            
+        with self.driver.session() as session:
+            session.run("""
+                MATCH (s:Entity {name: $source_name})
+                MATCH (t:Entity {name: $target_name})
+                CREATE (s)-[r:{}]->(t)
+            """.format(relationship.get('type', 'RELATES_TO')), 
+            source_name=relationship.get('source'),
+            target_name=relationship.get('target')
+            )

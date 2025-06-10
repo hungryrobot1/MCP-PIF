@@ -14,7 +14,6 @@ import {
   FileSystemError
 } from '../../types/errors';
 import { getDAL } from '../../dal';
-import { getMLClient } from '../ml-client';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -22,7 +21,6 @@ export class ProjectService implements IProjectService {
   private activeProject: Project | null = null;
   private readonly activeProjectFile: string;
   private readonly dal = getDAL();
-  private readonly mlClient = getMLClient();
 
   constructor(config?: ProjectServiceConfig) {
     this.activeProjectFile = config?.activeProjectFile || 
@@ -196,18 +194,6 @@ export class ProjectService implements IProjectService {
 
     const project = projectRecordToProject(createResult.value);
 
-    // Register with ML service
-    const mlResult = await this.mlClient.registerProject({
-      project_id: project.id,
-      path: project.rootPath
-    });
-
-    if (!mlResult.ok) {
-      // Rollback project creation
-      await this.dal.projects.delete(project.id);
-      return Result.err(mlResult.error);
-    }
-
     return Result.ok(project);
   }
 
@@ -234,16 +220,6 @@ export class ProjectService implements IProjectService {
         'active',
         'inactive'
       ));
-    }
-
-    // Unregister from ML service
-    const mlResult = await this.mlClient.unregisterProject({
-      project_id: projectResult.value.id,
-      cleanup_data: true
-    });
-
-    if (!mlResult.ok) {
-      return Result.err(mlResult.error);
     }
 
     // Delete from database (cascades to documents)
@@ -284,15 +260,15 @@ export class ProjectService implements IProjectService {
         const countResult = await this.dal.documents.countByProject(project.id);
         const documentCount = countResult.ok ? countResult.value : 0;
 
-        // Get ML service status
-        const mlStatus = await this.mlClient.getProjectStatus(project.id);
+        // The project record already contains stats
+        const projectRecord = projectsResult.value.find(p => p.id === project.id);
         
         info.stats = {
           documentCount,
           totalSize: 0, // TODO: Calculate from documents
-          indexedCount: mlStatus.ok ? mlStatus.value.indexed_files : 0,
-          lastIndexed: mlStatus.ok && mlStatus.value.last_indexed_at 
-            ? new Date(mlStatus.value.last_indexed_at)
+          indexedCount: projectRecord?.indexed_files || 0,
+          lastIndexed: projectRecord?.last_indexed_at 
+            ? new Date(projectRecord.last_indexed_at)
             : undefined
         };
       }
@@ -321,15 +297,6 @@ export class ProjectService implements IProjectService {
 
     const project = projectRecordToProject(projectResult.value);
 
-    // Notify ML service
-    const mlResult = await this.mlClient.setActiveProject({
-      project_id: project.id
-    });
-
-    if (!mlResult.ok) {
-      return Result.err(mlResult.error);
-    }
-
     // Save to file
     const saveResult = await this.saveActiveProject(project.id);
     if (!saveResult.ok) {
@@ -343,15 +310,6 @@ export class ProjectService implements IProjectService {
   }
 
   async deactivateProject(): Promise<Result<void>> {
-    // Clear ML service active project
-    const mlResult = await this.mlClient.setActiveProject({
-      project_id: undefined
-    });
-
-    if (!mlResult.ok) {
-      return Result.err(mlResult.error);
-    }
-
     // Clear file
     const saveResult = await this.saveActiveProject(null);
     if (!saveResult.ok) {
@@ -429,18 +387,16 @@ export class ProjectService implements IProjectService {
     const totalSize = documents.reduce((sum, doc) => sum + doc.size, 0);
     const indexedCount = documents.filter(doc => doc.has_embedding === 1).length;
 
-    // Get ML service status
-    const mlStatus = await this.mlClient.getProjectStatus(project.id);
-
+    // The project record already contains stats
     return Result.ok({
       id: project.id,
       alias: project.alias,
       name: project.name,
       documentCount: documents.length,
       totalSize,
-      indexedCount,
-      lastIndexed: mlStatus.ok && mlStatus.value.last_indexed_at
-        ? new Date(mlStatus.value.last_indexed_at)
+      indexedCount: projectResult.value.indexed_files || indexedCount,
+      lastIndexed: projectResult.value.last_indexed_at
+        ? new Date(projectResult.value.last_indexed_at)
         : undefined,
       isActive: this.activeProject?.id === project.id
     });
@@ -457,12 +413,8 @@ export class ProjectService implements IProjectService {
       return Result.err(new NotFoundError('project', alias));
     }
 
-    // Trigger rescan in ML service
-    const mlResult = await this.mlClient.rescanProject(projectResult.value.id);
-    if (!mlResult.ok) {
-      return Result.err(mlResult.error);
-    }
-
+    // TODO: Trigger re-indexing through the IndexingService
+    // For now, just return OK
     return Result.ok(undefined);
   }
 

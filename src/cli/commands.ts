@@ -7,67 +7,39 @@ export class Commands {
   constructor(private services: ServiceContext) {}
 
   async add(name: string, projectPath: string): Promise<Project> {
+    // Create project in database
     const result = await this.services.projects.addProject(name, projectPath);
     if (!result.ok) throw result.error;
     
-    // Register with ML service
-    console.log(chalk.gray('Registering project with ML service...'));
-    const mlResult = await this.services.ml.registerProject({
-      project_id: result.value.id,
-      path: result.value.rootPath
-    });
+    const project = result.value;
     
-    if (!mlResult.ok) {
-      console.warn(chalk.yellow('Warning: Could not register project with ML service'));
-      return result.value;
-    }
+    // Index the project using our new service
+    console.log(chalk.gray('Indexing project files...'));
     
-    // Show indexing progress
-    console.log(chalk.blue('Indexing project files...'));
-
-    let lastUpdate = Date.now();
-
-    const indexResult = await this.services.ml.waitForIndexing(
-      result.value.id,
-      (status) => {
-        // Show current file being processed
-        if (status.current_file) {
-          // Rate limit output to avoid flooding console
-          const now = Date.now();
-          if (now - lastUpdate > 100) { // Update every 100ms max
-            process.stdout.write('\r\x1b[K'); // Clear current line
-            process.stdout.write(chalk.gray(`  Indexing: ${path.basename(status.current_file)}`));
-            lastUpdate = now;
-          }
-        }
-        
-        // Log any errors immediately
-        if (status.progress.failed > 0 && status.errors && status.errors.length > 0) {
-          const latestError = status.errors[status.errors.length - 1];
-          process.stdout.write('\r\x1b[K'); // Clear current line
-          console.log(chalk.yellow(`  ⚠ Failed: ${latestError}`));
-        }
-      }
+    const indexResult = await this.services.indexing.indexProject(
+      project.id,
+      project.rootPath
     );
-
-    // Clear the last file line
-    process.stdout.write('\r\x1b[K');
-
+    
     if (!indexResult.ok) {
-      console.error(chalk.red('Error during indexing:'), indexResult.error.message);
-    } else {
-      const finalStatus = await this.services.ml.getIndexingStatus(result.value.id);
-      if (finalStatus.ok) {
-        const status = finalStatus.value;
-        console.log(chalk.green(`✓ Project indexed successfully`));
-        console.log(chalk.gray(`  Files processed: ${status.progress.processed}`));
-        if (status.progress.failed > 0) {
-          console.log(chalk.yellow(`  Files failed: ${status.progress.failed}`));
-        }
+      console.error(chalk.red('Indexing failed:'), indexResult.error.message);
+      return project;
+    }
+    
+    const stats = indexResult.value;
+    console.log(chalk.green(`✓ Indexed ${stats.successfulFiles} files successfully`));
+    
+    if (stats.failedFiles > 0) {
+      console.log(chalk.yellow(`⚠ Failed to index ${stats.failedFiles} files`));
+      if (stats.errors.length > 0) {
+        console.log(chalk.yellow('  Recent errors:'));
+        stats.errors.slice(0, 5).forEach(err => {
+          console.log(chalk.yellow(`    - ${path.basename(err.file)}: ${err.error}`));
+        });
       }
     }
     
-    return result.value;
+    return project;
   }
 
   async list() {
@@ -85,7 +57,13 @@ export class Commands {
     if (!projectResult.ok) throw projectResult.error;
     if (!projectResult.value) throw new Error(`Project '${alias}' not found`);
     
-    return projectResult.value;
+    // Start watching the project
+    const project = projectResult.value;
+    await this.services.indexing.startWatching(project.id, project.rootPath);
+    
+    console.log(chalk.green(`✓ Activated project '${alias}' with file watching`));
+    
+    return project;
   }
 
   async current(): Promise<Project | null> {
@@ -95,19 +73,13 @@ export class Commands {
   }
 
   async remove(alias: string): Promise<void> {
-    // Get project before removal for ML unregistration
+    // Get project before removal
     const projectResult = await this.services.projects.getProjectByAlias(alias);
     if (!projectResult.ok) throw projectResult.error;
     
     if (projectResult.value) {
-      // Unregister from ML service first
-      const mlResult = await this.services.ml.unregisterProject({
-        project_id: projectResult.value.id
-      });
-      
-      if (!mlResult.ok) {
-        console.warn(chalk.yellow('Warning: Could not unregister project from ML service'));
-      }
+      // Stop watching if needed
+      await this.services.indexing.stopWatching(projectResult.value.id);
     }
     
     const result = await this.services.projects.removeProject(alias);
@@ -119,6 +91,9 @@ export class Commands {
     if (!current) {
       throw new Error('No active project to deactivate');
     }
+    
+    // Stop watching
+    await this.services.indexing.stopWatching(current.id);
     
     const result = await this.services.projects.deactivateProject();
     if (!result.ok) throw result.error;
@@ -174,21 +149,8 @@ export class Commands {
     const currentProject = await this.current();
     const isActive = currentProject?.id === project.id;
     
-    // Get ML indexing status with better error handling
-    let mlStatus;
-    try {
-      mlStatus = await this.services.ml.getIndexingStatus(project.id);
-    } catch (e) {
-      console.warn(chalk.yellow('Warning: Could not fetch indexing status'));
-    }
-    
-    // Get project stats from ML service
-    let mlProjectStatus;
-    try {
-      mlProjectStatus = await this.services.ml.getProjectStatus(project.id);
-    } catch (e) {
-      console.warn(chalk.yellow('Warning: Could not fetch project statistics'));
-    }
+    // Get indexing progress if available
+    const indexingProgress = this.services.indexing.getIndexingProgress(project.id);
     
     // Return all available data
     return {
@@ -200,19 +162,11 @@ export class Commands {
         active: isActive,
         created: project.createdAt
       },
-      indexing: mlStatus?.ok ? {
-        status: mlStatus.value.status,
-        totalFiles: mlStatus.value.progress.total,
-        indexedFiles: mlStatus.value.progress.processed,
-        failedFiles: mlStatus.value.progress.failed,
-        pendingFiles: mlStatus.value.progress.pending,
-        lastIndexed: mlStatus.value.completed_at
-      } : undefined,
-      statistics: mlProjectStatus?.ok ? {
-        watching: mlProjectStatus.value.is_watching,
-        entities: mlProjectStatus.value.entity_counts || {},
-        relationships: mlProjectStatus.value.relationship_count || 0,
-        lastModified: mlProjectStatus.value.last_modified
+      indexing: indexingProgress ? {
+        status: indexingProgress.phase,
+        totalFiles: indexingProgress.totalFiles,
+        indexedFiles: indexingProgress.processedFiles,
+        currentFile: indexingProgress.currentFile
       } : undefined
     };
   }
@@ -223,7 +177,7 @@ export class Commands {
       throw new Error('No active project. Use "activate <alias>" to select a project.');
     }
     
-    const result = await this.services.ml.search({
+    const result = await this.services.dal.mlClient.search({
       query: query,
       projectIds: [activeProject.id],
       limit: 20
@@ -234,8 +188,8 @@ export class Commands {
   }
 
   async health(): Promise<{ ml: boolean; db: boolean }> {
-    // Check ML service
-    const mlHealth = await this.services.ml.checkHealth();
+    // Check ML service through DAL
+    const mlHealth = await this.services.dal.mlClient.checkHealth();
     const mlHealthy = mlHealth.ok && mlHealth.value.healthy;
     
     // Check database
@@ -249,8 +203,8 @@ export class Commands {
     const dalResult = await this.services.dal.connect();
     if (!dalResult.ok) throw dalResult.error;
     
-    // Check ML service
-    const mlHealth = await this.services.ml.checkHealth();
+    // Check ML service through DAL
+    const mlHealth = await this.services.dal.mlClient.checkHealth();
     if (!mlHealth.ok) {
       throw new Error('ML service is not available. Please ensure it is running.');
     }

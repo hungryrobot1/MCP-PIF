@@ -44,6 +44,8 @@ const fs = __importStar(require("fs"));
 const result_1 = require("../../types/result");
 const errors_1 = require("../../types/errors");
 const schema_1 = require("./schema");
+const migrator_1 = require("./migrator");
+const migrations = __importStar(require("./migrations"));
 class DatabaseConnection {
     db = null;
     dbPath;
@@ -69,6 +71,11 @@ class DatabaseConnection {
             this.db.pragma('foreign_keys = ON');
             // Set journal mode to WAL for better concurrency
             this.db.pragma('journal_mode = WAL');
+            // Run any pending migrations BEFORE creating tables
+            // This ensures existing databases are updated to match current schema
+            console.log('🔄 Checking database migrations...');
+            const migrator = new migrator_1.DatabaseMigrator(this.db);
+            await migrator.runMigrations(Object.values(migrations));
             // Initialize schema
             const schemaResult = await this.initializeSchema();
             if (!schemaResult.ok) {
