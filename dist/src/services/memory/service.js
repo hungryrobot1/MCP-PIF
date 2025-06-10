@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MemoryService = void 0;
 const result_1 = require("../../types/result");
 const errors_1 = require("../../types/errors");
-const ml_client_1 = require("../ml-client");
+const ml_client_1 = require("../../dal/ml-client");
 class MemoryService {
     mlClient = (0, ml_client_1.getMLClient)();
     constructor(_config) {

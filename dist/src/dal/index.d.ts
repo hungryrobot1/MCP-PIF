@@ -1,10 +1,13 @@
+import { DatabaseConnection } from './database/connection';
 import { IProjectOperations, IDocumentOperations, IThoughtOperations, IFileOperations } from './operations/types';
 import { Result } from '../types/result';
+import { IMLClient } from './ml-client';
 export interface DAL {
     projects: IProjectOperations;
     documents: IDocumentOperations;
     thoughts: IThoughtOperations;
     filesystem: IFileOperations;
+    mlClient: IMLClient;
     connect(): Promise<Result<void>>;
     disconnect(): Promise<Result<void>>;
     isConnected(): boolean;
@@ -15,6 +18,8 @@ export declare class DataAccessLayer implements DAL {
     readonly documents: IDocumentOperations;
     readonly thoughts: IThoughtOperations;
     readonly filesystem: IFileOperations;
+    readonly mlClient: IMLClient;
+    get database(): DatabaseConnection;
     constructor(dbPath?: string);
     connect(): Promise<Result<void>>;
     disconnect(): Promise<Result<void>>;

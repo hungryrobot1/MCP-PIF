@@ -5,6 +5,10 @@ export interface ProjectRecord {
     root_path: string;
     created_at: string;
     settings: string;
+    indexed_files?: number;
+    total_entities?: number;
+    last_indexed_at?: string;
+    indexing_status?: string;
 }
 export interface Project {
     id: string;

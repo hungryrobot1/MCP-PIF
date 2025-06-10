@@ -38,14 +38,12 @@ const result_1 = require("../../types/result");
 const domain_1 = require("../../types/domain");
 const errors_1 = require("../../types/errors");
 const dal_1 = require("../../dal");
-const ml_client_1 = require("../ml-client");
 const fs = __importStar(require("fs/promises"));
 const path = __importStar(require("path"));
 class ProjectService {
     activeProject = null;
     activeProjectFile;
     dal = (0, dal_1.getDAL)();
-    mlClient = (0, ml_client_1.getMLClient)();
     constructor(config) {
         this.activeProjectFile = config?.activeProjectFile ||
             path.join(process.env.HOME || process.env.USERPROFILE || '', '.mcp-pif', 'active-project');
@@ -186,16 +184,6 @@ class ProjectService {
             return createResult;
         }
         const project = (0, domain_1.projectRecordToProject)(createResult.value);
-        // Register with ML service
-        const mlResult = await this.mlClient.registerProject({
-            project_id: project.id,
-            path: project.rootPath
-        });
-        if (!mlResult.ok) {
-            // Rollback project creation
-            await this.dal.projects.delete(project.id);
-            return result_1.Result.err(mlResult.error);
-        }
         return result_1.Result.ok(project);
     }
     async removeProject(alias) {
@@ -214,14 +202,6 @@ class ProjectService {
         // Check if it's the active project
         if (this.activeProject?.id === projectResult.value.id) {
             return result_1.Result.err(new errors_1.StateError('project', 'active', 'inactive'));
-        }
-        // Unregister from ML service
-        const mlResult = await this.mlClient.unregisterProject({
-            project_id: projectResult.value.id,
-            cleanup_data: true
-        });
-        if (!mlResult.ok) {
-            return result_1.Result.err(mlResult.error);
         }
         // Delete from database (cascades to documents)
         return this.dal.projects.delete(projectResult.value.id);
@@ -254,14 +234,14 @@ class ProjectService {
                 // Get document count from database
                 const countResult = await this.dal.documents.countByProject(project.id);
                 const documentCount = countResult.ok ? countResult.value : 0;
-                // Get ML service status
-                const mlStatus = await this.mlClient.getProjectStatus(project.id);
+                // The project record already contains stats
+                const projectRecord = projectsResult.value.find(p => p.id === project.id);
                 info.stats = {
                     documentCount,
                     totalSize: 0, // TODO: Calculate from documents
-                    indexedCount: mlStatus.ok ? mlStatus.value.indexed_files : 0,
-                    lastIndexed: mlStatus.ok && mlStatus.value.last_indexed_at
-                        ? new Date(mlStatus.value.last_indexed_at)
+                    indexedCount: projectRecord?.indexed_files || 0,
+                    lastIndexed: projectRecord?.last_indexed_at
+                        ? new Date(projectRecord.last_indexed_at)
                         : undefined
                 };
             }
@@ -283,13 +263,6 @@ class ProjectService {
             return result_1.Result.err(new errors_1.NotFoundError('project', alias));
         }
         const project = (0, domain_1.projectRecordToProject)(projectResult.value);
-        // Notify ML service
-        const mlResult = await this.mlClient.setActiveProject({
-            project_id: project.id
-        });
-        if (!mlResult.ok) {
-            return result_1.Result.err(mlResult.error);
-        }
         // Save to file
         const saveResult = await this.saveActiveProject(project.id);
         if (!saveResult.ok) {
@@ -300,13 +273,6 @@ class ProjectService {
         return result_1.Result.ok(undefined);
     }
     async deactivateProject() {
-        // Clear ML service active project
-        const mlResult = await this.mlClient.setActiveProject({
-            project_id: undefined
-        });
-        if (!mlResult.ok) {
-            return result_1.Result.err(mlResult.error);
-        }
         // Clear file
         const saveResult = await this.saveActiveProject(null);
         if (!saveResult.ok) {
@@ -369,17 +335,16 @@ class ProjectService {
         const documents = documentsResult.value;
         const totalSize = documents.reduce((sum, doc) => sum + doc.size, 0);
         const indexedCount = documents.filter(doc => doc.has_embedding === 1).length;
-        // Get ML service status
-        const mlStatus = await this.mlClient.getProjectStatus(project.id);
+        // The project record already contains stats
         return result_1.Result.ok({
             id: project.id,
             alias: project.alias,
             name: project.name,
             documentCount: documents.length,
             totalSize,
-            indexedCount,
-            lastIndexed: mlStatus.ok && mlStatus.value.last_indexed_at
-                ? new Date(mlStatus.value.last_indexed_at)
+            indexedCount: projectResult.value.indexed_files || indexedCount,
+            lastIndexed: projectResult.value.last_indexed_at
+                ? new Date(projectResult.value.last_indexed_at)
                 : undefined,
             isActive: this.activeProject?.id === project.id
         });
@@ -393,11 +358,8 @@ class ProjectService {
         if (!projectResult.value) {
             return result_1.Result.err(new errors_1.NotFoundError('project', alias));
         }
-        // Trigger rescan in ML service
-        const mlResult = await this.mlClient.rescanProject(projectResult.value.id);
-        if (!mlResult.ok) {
-            return result_1.Result.err(mlResult.error);
-        }
+        // TODO: Trigger re-indexing through the IndexingService
+        // For now, just return OK
         return result_1.Result.ok(undefined);
     }
     async resolveProjectPath(relativePath) {

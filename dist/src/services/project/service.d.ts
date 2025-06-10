@@ -5,7 +5,6 @@ export declare class ProjectService implements IProjectService {
     private activeProject;
     private readonly activeProjectFile;
     private readonly dal;
-    private readonly mlClient;
     constructor(config?: ProjectServiceConfig);
     private ensureConnected;
     private loadActiveProject;

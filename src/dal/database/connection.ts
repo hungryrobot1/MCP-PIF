@@ -4,6 +4,8 @@ import * as fs from 'fs';
 import { Result } from '../../types/result';
 import { DatabaseError } from '../../types/errors';
 import { tableSchemas, documentsFTSSchema, thoughtsFTSSchema } from './schema';
+import { DatabaseMigrator } from './migrator';
+import * as migrations from './migrations';
 
 export class DatabaseConnection {
   private db: Database.Database | null = null;
@@ -38,6 +40,12 @@ export class DatabaseConnection {
       
       // Set journal mode to WAL for better concurrency
       this.db.pragma('journal_mode = WAL');
+      
+      // Run any pending migrations BEFORE creating tables
+      // This ensures existing databases are updated to match current schema
+      console.log('🔄 Checking database migrations...');
+      const migrator = new DatabaseMigrator(this.db);
+      await migrator.runMigrations(Object.values(migrations));
       
       // Initialize schema
       const schemaResult = await this.initializeSchema();

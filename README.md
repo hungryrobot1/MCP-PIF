@@ -1,168 +1,249 @@
-# MCP-PIF (Model Context Protocol - Personal Information Framework)
+# MCP-PIF (Personal Information Framework)
 
-A personal knowledge management system with intelligent search, code analysis, and thought tracking.
+A Model Context Protocol (MCP) server that provides intelligent code analysis and knowledge management through graph-based storage and semantic search.
 
-## 🚀 Quick Start
+## Overview
 
-### Setup (First Time Only)
-```bash
-# Install Node.js dependencies
-npm install
-```
+MCP-PIF combines TypeScript/Node.js for the CLI interface with Python-based ML services for code analysis, all backed by Neo4j for graph storage. The system watches your projects, extracts semantic information, and enables intelligent search across your codebase.
 
-That's it! The Python virtual environment and dependencies will be set up automatically when you start the application.
-
-### Start the Application
-
-```bash
-# Start MCP-PIF in interactive mode
-npm start
-
-# This will:
-# 1. Build the TypeScript project
-# 2. Set up Python venv automatically (if needed)
-# 3. Install Python dependencies (if needed)
-# 4. Start the ML service in the background
-# 5. Launch an interactive REPL
-```
-
-## 📋 Usage
-
-### Interactive Mode (Recommended)
-
-Once started, you'll see the interactive prompt:
+## Architecture
 
 ```
-╔═══════════════════════════════════════════╗
-║        MCP-PIF Interactive Mode           ║
-║   Personal Information Framework v1.0     ║
-╚═══════════════════════════════════════════╝
-
-Type "help" for available commands
-
-pif>
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   CLI/REPL      │────▶│   ML Service     │────▶│     Neo4j       │
+│  (TypeScript)   │ HTTP│    (Python)      │     │  (Graph DB)     │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+     Host                    Docker                    Docker
 ```
 
-#### Commands
+- **CLI/REPL**: User interface running on host machine
+- **ML Service**: Python FastAPI service for code analysis (Docker)
+- **Neo4j**: Graph database for storing entities and relationships (Docker)
 
-All commands are now single words for easier typing:
+## Prerequisites
+
+- Node.js 18+ and npm
+- Docker Desktop
+- 4GB+ available RAM
+- 2GB+ available disk space
+
+## Quick Start
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd MCP-PIF
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Start the application**
+   ```bash
+   npm start
+   ```
+
+   This will:
+   - Check Docker is running
+   - Start Neo4j and ML services in containers
+   - Build TypeScript code
+   - Launch the interactive REPL
+
+4. **First time setup**
+   ```bash
+   # In the REPL
+   pif> add myproject /path/to/your/project
+   pif> info myproject
+   ```
+
+## Usage
+
+### Basic Commands
 
 ```bash
 # Project Management
-add <name> <path>      # Add a new project
-list                   # List all projects
-activate <alias>       # Activate a project
-current                # Show current project
-remove <alias>         # Remove a project
-
-# Search & Analysis
-search <query>         # Search in active project
-
-# System
-health                 # Check system status
-init                   # Initialize system
-
-# REPL Commands
-help, ?                # Show help
-clear, cls             # Clear screen
-exit, quit             # Exit REPL
-```
-
-#### Example Session
-
-```bash
-pif> add myproject /path/to/your/code
-✓ Project 'myproject' added with alias 'myproject'
-
-pif> activate myproject
-✓ Project 'myproject' (myproject) is now active
-
-pif [myproject]> search "database connection"
-[Search results displayed here...]
-
-pif [myproject]> list
-┌─────────┬─────────┬─────────────────────┬────────┐
-│ Alias   │ Name    │ Path                │ Active │
-├─────────┼─────────┼─────────────────────┼────────┤
-│ myproject│ myproject│ /path/to/your/code │ ✓      │
-└─────────┴─────────┴─────────────────────┴────────┘
-
-pif [myproject]> exit
-Goodbye!
-```
-
-### CLI Mode
-
-You can also use MCP-PIF directly from the command line:
-
-```bash
-# Initialize the system
-pif init
-
-# Add and activate a project
-pif add myproject /path/to/your/code
-pif activate myproject
+add <name> <path>     # Add a new project
+list                  # List all projects
+info [project]        # Show project details
+remove <project>      # Remove a project
+activate <project>    # Set active project
 
 # Search
-pif search "authentication logic"
+search <query>        # Search in active project
+search-all <query>    # Search across all projects
 
-# List projects
-pif list
-
-# Check system health
-pif health
+# System
+health               # Check system status
+help                 # Show all commands
+exit                 # Exit the REPL
 ```
 
-### Tips
+### Docker Management
 
-- **Tab Completion**: Press Tab to autocomplete commands in interactive mode
-- **Active Project**: The active project appears in the prompt `pif [project]>`
-- **Quick Start**: Just run `npm start` - everything else is automatic
-- **Stop Services**: Run `npm stop` to stop the ML service
+```bash
+# View logs
+npm run logs:ml      # ML service logs
+npm run logs:neo4j   # Neo4j logs
+npm run docker:logs  # All logs
 
-## 🏗️ Architecture
+# Service control
+npm run docker:stop  # Stop services (data persists)
+npm run docker:down  # Stop and remove containers
+npm run docker:clean # Remove everything including data
 
-MCP-PIF consists of:
+# Development
+npm run dev          # Start with live reload
+```
 
-1. **TypeScript CLI & MCP Server**: Handles user interaction and implements the Model Context Protocol
-2. **Python ML Service**: Provides intelligent search using embeddings and code analysis
-3. **SQLite Database**: Stores project metadata and thoughts
-4. **Neo4j (Optional)**: Graph database for advanced code relationship analysis
-
-## 🔧 Advanced Configuration
+## Configuration
 
 ### Environment Variables
 
-- `ML_SERVICE_URL`: ML service endpoint (default: `http://127.0.0.1:8002`)
-- `PIF_DB_PATH`: Database location (default: `~/.mcp-pif/mcp-pif.db`)
-- `PORT`: ML service port (default: `8002`)
-
-### Python ML Module
-
-The ML module configuration can be found in `ml_module/.env`:
-
-```env
-ML_PORT=8002
-ML_NEO4J_URI=bolt://localhost:7687
-ML_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-```
-
-## 🛠️ Development
+Create a `.env` file in the project root:
 
 ```bash
-# Run TypeScript build in watch mode
-npm run dev
+# Neo4j Configuration
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=password
 
-# Run tests
-npm test
-
-# Check types
-npm run typecheck
-
-# Lint code
-npm run lint
+# ML Service Configuration
+ML_SERVICE_URL=http://localhost:8002
+ML_DEBUG=false
 ```
 
-## 📝 License
+### Docker Resources
 
-MIT License - see LICENSE file for details.
+The default configuration limits resource usage:
+- Neo4j: 1-2GB RAM
+- ML Service: ~1GB RAM
+
+Adjust in `docker-compose.yml` if needed.
+
+## Development
+
+### Project Structure
+
+```
+MCP-PIF/
+├── src/                 # TypeScript source
+│   ├── cli/            # CLI commands and REPL
+│   ├── services/       # Service layer
+│   └── types/          # Type definitions
+├── ml_module/          # Python ML service
+│   ├── core/           # Core ML functionality
+│   ├── server.py       # FastAPI server
+│   └── Dockerfile      # ML service container
+├── scripts/            # Utility scripts
+├── docker-compose.yml  # Service orchestration
+└── package.json        # Node.js configuration
+```
+
+### Running Tests
+
+```bash
+# TypeScript tests
+npm test
+
+# Python tests (ML module)
+docker-compose exec ml-service pytest
+
+# Integration tests
+npm run test:integration
+```
+
+### Adding New Features
+
+1. **CLI Commands**: Add to `src/cli/commands.ts`
+2. **ML Endpoints**: Add to `ml_module/server.py`
+3. **Entity Extraction**: Modify `ml_module/core/entity_extractor.py`
+
+## Troubleshooting
+
+### Common Issues
+
+**Docker not running**
+```bash
+Error: Docker is not running
+# Solution: Start Docker Desktop
+```
+
+**Port conflicts**
+```bash
+Error: Port 7687 already in use
+# Solution: Stop Neo4j Desktop or change ports in docker-compose.yml
+```
+
+**ML service unhealthy**
+```bash
+# Check logs
+docker-compose logs ml-service --tail=50
+
+# Restart service
+docker-compose restart ml-service
+```
+
+**Out of memory**
+```bash
+# Check Docker resources
+docker system df
+
+# Clean up
+docker system prune -a
+npm run docker:clean
+```
+
+### Reset Everything
+
+```bash
+# Complete reset
+npm run docker:clean
+docker system prune -a
+npm start
+```
+
+## Neo4j Access
+
+You can access the Neo4j browser interface:
+- URL: http://localhost:7474
+- Username: neo4j
+- Password: password
+
+Example Cypher queries:
+```cypher
+// Count all entities
+MATCH (e:Entity) RETURN count(e);
+
+// Find functions by project
+MATCH (f:File {project_id: $projectId})-[:CONTAINS]->(e:Entity {type: 'function'})
+RETURN e.name, f.path;
+```
+
+## API Endpoints
+
+The ML service exposes REST APIs on port 8002:
+
+- `GET /health` - Health check
+- `POST /projects/register` - Register a project
+- `GET /projects/{id}/status` - Get project status
+- `POST /search` - Semantic search
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## License
+
+[Your License Here]
+
+## Acknowledgments
+
+- Built with [MCP SDK](https://github.com/anthropics/mcp)
+- Powered by [Neo4j](https://neo4j.com)
+- ML by [Sentence Transformers](https://www.sbert.net)
