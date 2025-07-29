@@ -1,0 +1,20 @@
+{:source-paths ["src"]
+ 
+ :dependencies [[org.clojure/clojurescript "1.11.132"]
+                [org.clojure/core.async "1.6.681"]
+                [com.cognitect/transit-cljs "0.8.280"]
+                [datascript "1.6.5"]
+                [meander/epsilon "0.0.650"]
+                [binaryage/devtools "1.0.7"]]
+ 
+ :builds {:mcp-server {:target :node-script
+                       :output-to "out/mcp-server.js"
+                       :main mcp.core/main
+                       :devtools {:after-load mcp.core/reload!}}
+          
+          :test {:target :node-test
+                 :output-to "out/test.js"
+                 :ns-regexp "-test$"
+                 :autorun true}}
+ 
+ :dev-http {8080 "public"}}

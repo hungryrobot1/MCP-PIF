@@ -1,0 +1,55 @@
+{
+  "dxt_version": "0.1",
+  "name": "mcp-pif-cljs",
+  "version": "0.2.0",
+  "description": "A self-modifying MCP server with metaprogramming capabilities built in ClojureScript",
+  "author": {
+    "name": "MCP-PIF Team"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "out/mcp-server.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/out/mcp-server.js"]
+    }
+  },
+  "tools": [
+    {
+      "name": "memory-store",
+      "description": "Store key-value pairs in memory"
+    },
+    {
+      "name": "memory-retrieve",
+      "description": "Retrieve values from memory"
+    },
+    {
+      "name": "journal-recent",
+      "description": "View recent activity journal"
+    },
+    {
+      "name": "server-info",
+      "description": "Get comprehensive server information including all tools and system state"
+    },
+    {
+      "name": "meta-evolve",
+      "description": "Create new tools at runtime"
+    },
+    {
+      "name": "execute-tool",
+      "description": "Execute any tool by name including dynamic ones"
+    }
+  ],
+  "compatibility": {
+    "node": ">=16.0.0"
+  },
+  "config": [],
+  "user_config": [],
+  "keywords": [
+    "mcp",
+    "metaprogramming",
+    "self-modifying",
+    "clojurescript",
+    "homoiconicity"
+  ]
+}

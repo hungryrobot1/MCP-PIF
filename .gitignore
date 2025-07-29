@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.cpcache/
+
+# Build outputs
+out/
+.shadow-cljs/
+target/
+
+# .dxt build
+*.dxt
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.nrepl-port
+.lsp/
+.clj-kondo/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Archive
+archive-typescript-version/
+
+# Temporary
+tmp/
+temp/
+node_modules
+node_modules
