@@ -1,0 +1,21 @@
+{:paths ["src"]
+ 
+ :deps {org.clojure/clojure {:mvn/version "1.11.1"}
+        org.clojure/clojurescript {:mvn/version "1.11.132"}
+        org.clojure/core.async {:mvn/version "1.6.681"}
+        org.clojure/core.logic {:mvn/version "1.0.1"}
+        datascript/datascript {:mvn/version "1.6.5"}
+        meander/epsilon {:mvn/version "0.0.650"}
+        com.cognitect/transit-cljs {:mvn/version "0.8.280"}
+        binaryage/devtools {:mvn/version "1.0.7"}}
+ 
+ :aliases {:dev {:extra-deps {thheller/shadow-cljs {:mvn/version "2.28.2"}
+                              cider/cider-nrepl {:mvn/version "0.45.0"}}
+                 :main-opts ["-m" "shadow.cljs.devtools.cli"]}
+           
+           :test {:extra-paths ["test"]
+                  :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}
+                               lambdaisland/kaocha-cljs {:mvn/version "1.5.154"}}}
+           
+           :build {:deps {io.github.clojure/tools.build {:git/tag "v0.10.3" :git/sha "15ead66"}}
+                   :ns-default build}}}

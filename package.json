@@ -1,91 +1,31 @@
 {
-  "name": "mcp-pif",
-  "version": "0.1.0",
-  "description": "Model Context Protocol - Personal Information Framework",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "bin": {
-    "pif": "./dist/cli/index.js"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
+  "name": "mcp-pif-cljs",
+  "version": "0.2.0",
+  "description": "Model Context Protocol - Personal Information Framework (ClojureScript)",
+  "main": "out/mcp-server.js",
   "scripts": {
-    "start": "tsx scripts/startup.ts",
-    "dev": "docker-compose up -d && tsx --watch scripts/startup.ts",
-    "build": "tsc",
-    "test": "jest",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "docker:stop": "docker-compose stop",
-    "docker:logs": "docker-compose logs -f",
-    "docker:clean": "docker-compose down -v",
-    "docker:rebuild": "docker-compose build --no-cache",
-    "logs:ml": "docker-compose logs -f ml-service",
-    "logs:neo4j": "docker-compose logs -f neo4j",
-    "test:ml": "docker-compose run --rm ml-service-test",
-    "test:ml:unit": "docker-compose run --rm ml-service-test pytest tests/unit/ -v",
-    "test:ml:integration": "docker-compose run --rm ml-service-test pytest tests/integration/ -v",
-    "test:ml:coverage": "docker-compose run --rm ml-service-test pytest --cov=core --cov=server --cov-report=html --cov-report=term",
-    "test:ml:watch": "docker-compose run --rm ml-service-test pytest-watch",
-    "docker:test:up": "docker-compose --profile test up -d",
-    "docker:test:down": "docker-compose --profile test down -v",
-    "docker:test:logs": "docker-compose --profile test logs -f",
-    "repl": "tsx src/cli/repl.ts",
-    "clean": "rm -rf dist",
-    "test:watch": "jest --watch",
-    "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit",
-    "prepare": "npm run build",
-    "mcp:start": "node dist/server/index.js",
-    "pif:init": "./dist/cli/index.js system init --ml-url http://127.0.0.1:8002",
-    "pif": "./dist/cli/index.js"
+    "dev": "shadow-cljs watch mcp-server",
+    "build": "shadow-cljs compile mcp-server",
+    "release": "shadow-cljs release mcp-server",
+    "test": "echo 'Run test files directly: node test-clean-protocol.js'",
+    "repl": "shadow-cljs cljs-repl mcp-server",
+    "clean": "rm -rf out .shadow-cljs",
+    "start": "node out/mcp-server.js"
   },
   "keywords": [
     "mcp",
     "model-context-protocol",
-    "knowledge-management",
-    "personal-information"
+    "clojurescript",
+    "self-modifying",
+    "metaprogramming"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.1",
-    "@types/uuid": "^10.0.0",
-    "better-sqlite3": "^11.3.0",
-    "chalk": "^4.1.2",
-    "chokidar": "^3.6.0",
-    "cli-progress": "^3.12.0",
-    "cli-table3": "^0.6.5",
-    "commander": "^12.1.0",
-    "cosmiconfig": "^9.0.0",
-    "dotenv": "^16.4.5",
-    "hash-sum": "^2.0.0",
-    "minimatch": "^9.0.3",
-    "ora": "^5.4.1",
-    "p-queue": "^8.0.1",
-    "uuid": "^11.1.0",
-    "winston": "^3.13.0",
-    "zod": "^3.23.8"
+    "ws": "^8.16.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
-    "@types/cli-progress": "^3.11.6",
-    "@types/jest": "^29.5.12",
-    "@types/minimatch": "^5.1.2",
-    "@types/node": "^20.14.11",
-    "@typescript-eslint/eslint-plugin": "^7.16.1",
-    "@typescript-eslint/parser": "^7.16.1",
-    "concurrently": "^9.1.2",
-    "eslint": "^8.57.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.5",
-    "tsx": "^4.16.2",
-    "typescript": "^5.5.3"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "shadow-cljs": "^2.28.2"
   }
 }

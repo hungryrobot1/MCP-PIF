@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mcp-pif-cljs": {
+      "command": "node",
+      "args": ["/Users/zacharygrunenberg/MCP-PIF/MCP-PIF/home/projects/MCP-PIF-TEST/MCP-PIF/out/mcp-server.js"],
+      "env": {}
+    }
+  }
+}
