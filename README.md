@@ -15,7 +15,7 @@ It leverages Clojure's code-as-data philosophy known as homoiconicity, is design
 
 1. **Clone and build:**
    ```bash
-   git clone <[repository-url](https://github.com/hungryrobot1/MCP-PIF)>
+   git clone <https://github.com/hungryrobot1/MCP-PIF>
    cd MCP-PIF
    npm install
    npx shadow-cljs compile mcp-server
