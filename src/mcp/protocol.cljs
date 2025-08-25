@@ -86,7 +86,7 @@
                         (catch js/Error _ nil))]
         (when request-id
           (send-response! (assoc (error-response -32603 "Failed to process request" (.-message e))
-                                :id request-id))))))
+                                :id request-id)))))))
 
 (defn start-server! [handler]
   (js/console.error "[Protocol] Starting JSON-RPC server on stdio...")
