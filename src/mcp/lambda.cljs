@@ -1,8 +1,6 @@
 (ns mcp.lambda
   "Pure lambda calculus evaluator for formal reasoning"
   (:require [clojure.walk :as walk]
-            [clojure.set :as set]
-            [clojure.string :as str]
             [cljs.reader :refer [read-string]]))
 
 (defn free-vars
@@ -14,7 +12,7 @@
     (let [[_ param body] expr]
       (disj (free-vars body) param))
     (vector? expr)
-    (apply set/union (map free-vars expr))
+    (apply clojure.set/union (map free-vars expr))
     :else #{}))
 
 (defn substitute
@@ -51,7 +49,6 @@
     (and (vector? expr)
          (= (count expr) 2)
          (vector? (first expr))
-         (= (count (first expr)) 3)
          (= (first (first expr)) 'λ))
     (let [[[_ param body] arg] expr]
       (substitute body param arg))
@@ -104,25 +101,13 @@
 (defn parse-lambda-string
   "Parse a string representation of lambda calculus"
   [s]
-  ;; Parse expressions like: "(λ x x)" or "['λ 'x 'x]"
-  ;; Convert to Clojure data structure format
+  ;; Simple parser for expressions like: "(λx. x x) (λy. y)"
+  ;; This is a placeholder - you'd want a proper parser
   (try
-    (cond
-      ;; Already in Clojure vector format
-      (str/starts-with? (str/trim s) "[")
-      (read-string s)
-      
-      ;; Lambda notation with λ symbol
-      (str/includes? s "λ")
-      (read-string (-> s
-                      (str/replace #"λ" "'λ")
-                      (str/replace #"([a-zA-Z_][a-zA-Z0-9_]*)" "'$1")
-                      (str/replace #"'\(" "(")
-                      (str/replace #"''" "'")))
-      
-      ;; Try direct read
-      :else
-      (read-string s))
+    (read-string (-> s
+                     (clojure.string/replace #"λ" "λ ")
+                     (clojure.string/replace #"\." " ")
+                     (clojure.string/replace #"([^()\s]+)" "'$1")))
     (catch js/Error e
       nil)))
 

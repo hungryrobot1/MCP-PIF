@@ -1,11 +1,7 @@
 (ns mcp.tools
   "Base tools for the MCP server"
   (:require [mcp.journal :as journal]
-            [mcp.meta :as meta]
-            [mcp.lambda :as lambda]
-            [mcp.types :as types]
-            [mcp.proof :as proof]
-            [cljs.reader :refer [read-string]]))
+            [mcp.meta :as meta]))
 
 (defn memory-store
   "Store a key-value pair in memory"
@@ -109,45 +105,6 @@
                                              :description "JSON Schema for the tool's parameters"}}
                          :required ["type" "name" "description" "code"]}
                  :handler meta-evolve}
-   
-   :lambda-eval {:description "Evaluate lambda calculus expressions with beta reduction"
-                 :schema {:type "object"
-                         :properties {:expression {:type "string"
-                                                  :description "Lambda calculus expression, e.g. \"['λ 'x 'x]\""}
-                                     :max-steps {:type "number"
-                                               :default 100
-                                               :description "Maximum reduction steps"}}
-                         :required ["expression"]}
-                 :handler lambda/evaluate-lambda-tool}
-   
-   :type-check {:description "Perform Hindley-Milner type inference on a lambda expression"
-                :schema {:type "object"
-                        :properties {:expression {:type "string"
-                                                 :description "Expression to type check, e.g. \"['λ 'x 'x]\""}}
-                        :required ["expression"]}
-                :handler (fn [{:keys [expression]} _]
-                          (let [parsed (try (read-string expression) 
-                                          (catch js/Error _ nil))]
-                            (if parsed
-                              (let [result (types/check-type parsed)]
-                                (if (:success result)
-                                  (str "Type: " (:type result))
-                                  (str "Type check failed: " (:message result))))
-                              "Invalid expression")))}
-   
-   :prove {:description "Prove logical formulas using natural deduction, contradiction, or sequent calculus"
-           :schema {:type "object"
-                   :properties {:premises {:type "array"
-                                          :items {:type "string"}
-                                          :description "List of premises, e.g. [\"A\", \"[:implies A B]\"]"}
-                               :goal {:type "string"
-                                     :description "Goal formula to prove, e.g. \"B\""}
-                               :method {:type "string"
-                                       :enum ["auto" "natural-deduction" "contradiction" "sequent"]
-                                       :default "auto"
-                                       :description "Proof method to use"}}
-                   :required ["premises" "goal"]}
-           :handler proof/proof-tool}
    
    :execute-tool {:description "Execute any tool by name, including dynamically created tools. Use this to call tools created with meta-evolve."
                   :schema {:type "object"
