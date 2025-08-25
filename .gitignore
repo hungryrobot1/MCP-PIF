@@ -14,6 +14,9 @@ target/
 .env
 .env.local
 
+# Configuration
+claude-desktop-config.json
+
 # IDE
 .idea/
 .vscode/
