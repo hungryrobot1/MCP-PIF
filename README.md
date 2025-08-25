@@ -1,8 +1,8 @@
-# MCP-PIF-CLJS: A Self-Modifying MCP Server
+# MCP-PIF-CLJS: A Self-Modifying MCP Server with Formal Reasoning
 
-A Model Context Protocol (MCP) server written in ClojureScript that explores homoiconicity, introspection, and metaprogramming to enable runtime tool creation and safe self-modification capabilities. It allows models like Claude to create and execute new tools during runtime without restarting the server. For example, tools for arithmetic can perform actual calculations, not LLM approximations based on pattern matching.
+A Model Context Protocol (MCP) server written in ClojureScript that explores homoiconicity, formal reasoning, and metaprogramming to enable runtime tool creation and safe self-modification capabilities. It allows models like Claude to create and execute new tools during runtime, evaluate lambda calculus expressions, perform type inference, and prove logical theorems—all without restarting the server.
 
-It leverages Clojure's code-as-data philosophy known as homoiconicity, is designed to block dangerous operations, and all modifications are journaled and auditable.
+This project combines Clojure's code-as-data philosophy with formal methods, providing a unique platform for exploring self-verifying code, type-driven development, and automated reasoning within an AI-assisted environment.
 
 ## 🚀 Quick Start
 
@@ -59,8 +59,13 @@ This creates `mcp-pif-cljs.dxt` which can be installed via drag-and-drop in Clau
 - `server-info` - Get comprehensive server information (all tools, state, statistics)
 
 ### Meta-Programming Tools
-- `meta-evolve` - Create new tools at runtime
+- `meta-evolve` - Create new tools at runtime (arithmetic, string, lambda, typed)
 - `execute-tool` - Execute any tool by name (including dynamic ones)
+
+### Formal Reasoning Tools
+- `lambda-eval` - Evaluate lambda calculus expressions with beta reduction
+- `type-check` - Perform Hindley-Milner type inference on expressions
+- `prove` - Automated theorem proving for propositional logic
 
 ## 💡 Example Usage
 
@@ -82,6 +87,21 @@ Claude: I'll create that tool for you using meta-evolve...
 
 You: "What's the area of a circle with radius 5?"
 Claude: The area is 78.54 square units.
+```
+
+### Lambda Calculus & Formal Reasoning
+```
+You: "Evaluate the lambda expression for identity function applied to 42"
+Claude: Using lambda-eval with expression: [(λ x x) 42]
+Result: 42 (reduced in 1 step)
+
+You: "What's the type of function composition?"
+Claude: Using type-check on (λ f (λ g (λ x [g [f x]])))
+Type: ((a → b) → ((b → c) → (a → c)))
+
+You: "Prove that if A implies B and we have A, then B follows"
+Claude: Using the prove tool with modus ponens...
+Proof found! B is derived from premises A and A→B.
 ```
 
 ### The Dynamic Tool Workflow
@@ -132,7 +152,10 @@ src/mcp/
 ├── tools.cljs       # Tool definitions and handlers
 ├── meta.cljs        # Self-modification engine
 ├── evaluator.cljs   # Safe JavaScript evaluation
-└── journal.cljs     # Activity logging (DataScript)
+├── journal.cljs     # Activity logging (DataScript)
+├── lambda.cljs      # Lambda calculus evaluator
+├── types.cljs       # Hindley-Milner type inference
+└── proof.cljs       # Automated theorem proving
 ```
 
 ## 🔒 Safety Mechanisms
@@ -163,6 +186,9 @@ node test-clean-protocol.js
 
 # Dynamic tools test
 node test-dynamic-tools.js
+
+# Formal reasoning test
+node test-formal-reasoning.js
 ```
 
 ## 🎯 Philosophy
@@ -171,6 +197,7 @@ This project explores the intersection of:
 - **Homoiconicity**: Code as data, data as code
 - **Self-Reference**: A system that can reason about itself
 - **Controlled Evolution**: Safe boundaries for self-modification
+- **Formal Methods**: Type systems and proof checking for verified computation
 - **Human-AI Collaboration**: AI proposes, human uses
 
 ## 📋 Roadmap
@@ -180,18 +207,25 @@ Completed:
 - Runtime tool creation
 - Universal tool executor (workaround for client caching)
 - .dxt packaging support
+- Lambda calculus evaluator with Church encodings
+- Hindley-Milner type inference system
+- Automated theorem proving for propositional logic
 
 In progress:
 - Tool composition (tools that use other tools)
 - Namespace evolution
 - Import capabilities from other MCP servers
 - Persistent tool storage
+- Dependent type system
+- SMT solver integration
+- Self-verifying tool creation
 
 ## ⚠️ Important Notes
 
 1. **Tool Persistence**: Tools only exist while server is running
 2. **Client Caching**: Use `execute-tool` to call runtime-created tools
 3. **Real Computation**: Tools execute actual code, not LLM approximations
+4. **Experimental Server**: Work in progress, tools may not work as expected
 
 ## 🤝 Contributing
 
