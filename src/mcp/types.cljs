@@ -1,4 +1,5 @@
-(ns mcp.types
+(
+  ns mcp.types
   "Simple Hindley-Milner type inference for lambda calculus"
   (:require [clojure.walk :as walk]
             [cljs.reader :refer [read-string]]))
@@ -31,17 +32,17 @@
   [t1 t2]
   (cond
     (= t1 t2) {}
-    
+
     (keyword? t1)
     (if (occurs? t1 t2)
       nil
       {t1 t2})
-    
+
     (keyword? t2)
     (if (occurs? t2 t1)
       nil
       {t2 t1})
-    
+
     (and (vector? t1) (vector? t2)
          (= (first t1) (first t2) '->)
          (= (count t1) (count t2) 3))
@@ -54,7 +55,7 @@
               s2 (unify r1' r2')]
           (when s2
             (merge s1 s2)))))
-    
+
     :else nil))
 
 (defn apply-substitution
@@ -73,7 +74,7 @@
        [type {}]
        (let [tvar (fresh-type-var)]
          [tvar {}]))
-     
+
      ;; Abstraction: λx.e
      (and (vector? expr) (= (first expr) 'λ))
      (let [[_ param body] expr
@@ -81,7 +82,7 @@
            [body-type body-subst] (infer-type body (assoc env param param-type))
            result-type ['-> (apply-substitution body-subst param-type) body-type]]
        [result-type body-subst])
-     
+
      ;; Application: (f x)
      (and (vector? expr) (= (count expr) 2))
      (let [[func arg] expr
@@ -95,7 +96,7 @@
          [(apply-substitution unified result-type)
           (merge func-subst arg-subst unified)]
          [nil nil]))
-     
+
      :else [nil nil])))
 
 (defn type->string
