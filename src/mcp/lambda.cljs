@@ -1,7 +1,9 @@
 (ns mcp.lambda
-  "Pure lambda calculus evaluator for formal reasoning"
+  "Pure lambda calculus evaluator with robust parsing"
   (:require [clojure.walk :as walk]
-            [cljs.reader :refer [read-string]]))
+            [clojure.set :as set]
+            [clojure.string :as str]
+            [cljs.reader :as reader]))
 
 (defn free-vars
   "Get free variables in a lambda term"
@@ -12,7 +14,7 @@
     (let [[_ param body] expr]
       (disj (free-vars body) param))
     (vector? expr)
-    (apply clojure.set/union (map free-vars expr))
+    (apply set/union (map free-vars expr))
     :else #{}))
 
 (defn substitute
@@ -22,7 +24,7 @@
     ;; Variable
     (symbol? expr)
     (if (= expr var) replacement expr)
-    
+
     ;; Abstraction
     (and (vector? expr) (= (first expr) 'λ))
     (let [[_ param body] expr]
@@ -34,11 +36,11 @@
           ['λ new-param (substitute (substitute body param new-param) var replacement)])
         :else
         ['λ param (substitute body var replacement)]))
-    
+
     ;; Application
     (vector? expr)
     (mapv #(substitute % var replacement) expr)
-    
+
     :else expr))
 
 (defn beta-reduce
@@ -49,10 +51,11 @@
     (and (vector? expr)
          (= (count expr) 2)
          (vector? (first expr))
+         (= (count (first expr)) 3)
          (= (first (first expr)) 'λ))
     (let [[[_ param body] arg] expr]
       (substitute body param arg))
-    
+
     ;; Try to reduce inside application
     (and (vector? expr) (= (count expr) 2))
     (let [[func arg] expr
@@ -60,7 +63,7 @@
       (if (not= func func')
         [func' arg]
         [func (beta-reduce arg)]))
-    
+
     ;; Try to reduce inside abstraction
     (and (vector? expr) (= (first expr) 'λ))
     (let [[_ param body] expr
@@ -68,7 +71,7 @@
       (if (not= body body')
         ['λ param body']
         expr))
-    
+
     :else expr))
 
 (defn normalize
@@ -95,29 +98,53 @@
 (def S ['λ 'f ['λ 'g ['λ 'x [['f 'x] ['g 'x]]]]])  ; Substitution
 
 ;; Y combinator (for recursion)
-(def Y ['λ 'f [['λ 'x ['f ['x 'x]]] 
+(def Y ['λ 'f [['λ 'x ['f ['x 'x]]]
                ['λ 'x ['f ['x 'x]]]]])
 
 (defn parse-lambda-string
   "Parse a string representation of lambda calculus"
   [s]
-  ;; Simple parser for expressions like: "(λx. x x) (λy. y)"
-  ;; This is a placeholder - you'd want a proper parser
   (try
-    (read-string (-> s
-                     (clojure.string/replace #"λ" "λ ")
-                     (clojure.string/replace #"\." " ")
-                     (clojure.string/replace #"([^()\s]+)" "'$1")))
+    (cond
+      ;; Already parsed as data structure
+      (not (string? s)) s
+
+      ;; Contains lambda symbol - use safe replacement
+      (str/includes? s "λ")
+      (try
+        ;; Use a safe word that won't trigger any special behavior
+        (let [safe-s (str/replace s #"λ" "__LAMBDA__")
+              ;; Read with eval disabled - just parse as data
+              parsed (binding [reader/*read-eval* false]
+                      (reader/read-string safe-s))]
+          ;; Walk and replace __LAMBDA__ with the λ symbol
+          (walk/postwalk (fn [x]
+                          (cond
+                            (and (symbol? x) (= (str x) "__LAMBDA__")) 'λ
+                            :else x))
+                        parsed))
+        (catch js/Error e
+          ;; Fallback: treat as quoted
+          (reader/read-string (str "'" s))))
+
+      ;; Already in quoted format ['λ 'x 'x]
+      (str/includes? s "'λ")
+      (reader/read-string s)
+
+      ;; Try direct read (for already valid ClojureScript)
+      :else
+      (reader/read-string s))
     (catch js/Error e
-      nil)))
+      (throw (js/Error. (str "Parse error: " (.-message e)))))))
 
 (defn evaluate-lambda-tool
   "Evaluate a lambda calculus expression"
   [{:keys [expression max-steps]} _state]
-  (if-let [parsed (or (parse-lambda-string expression)
-                      (try (read-string expression) (catch js/Error _ nil)))]
-    (let [result (normalize parsed :max-steps (or max-steps 100))]
-      (str "Result: " (pr-str (:result result)) 
+  (try
+    (let [parsed (parse-lambda-string expression)
+          result (normalize parsed :max-steps (or max-steps 100))]
+      (str "Result: " (pr-str (:result result))
            "\nStatus: " (:status result)
            "\nSteps: " (:steps result)))
-    "Error: Invalid lambda expression"))
+    (catch js/Error e
+      (str "Error: " (.-message e)))))

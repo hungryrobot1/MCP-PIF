@@ -1,12 +1,29 @@
 (ns mcp.types
-  "Simple Hindley-Milner type inference for lambda calculus"
+  "Improved Hindley-Milner type inference with readable type variables"
   (:require [clojure.walk :as walk]
-            [cljs.reader :refer [read-string]]))
+            [clojure.string :as str]
+            [cljs.reader :refer [read-string]]
+            [mcp.lambda :as lambda]))
+
+;; Global counter for generating readable type variables
+(def ^:private type-var-counter (atom 0))
+
+(defn reset-type-vars!
+  "Reset type variable counter for fresh inference"
+  []
+  (reset! type-var-counter 0))
 
 (defn fresh-type-var
-  "Generate a fresh type variable"
+  "Generate a fresh, readable type variable (a, b, c, ...)"
   []
-  (keyword (str "t" (random-uuid))))
+  (let [n @type-var-counter
+        letters "abcdefghijklmnopqrstuvwxyz"
+        var-name (if (< n 26)
+                   (str (nth letters n))
+                   (str (nth letters (mod n 26)) (inc (quot n 26))))]
+    (swap! type-var-counter inc)
+    (keyword var-name)))
+
 
 (defn occurs?
   "Check if type variable occurs in type (for occurs check)"
@@ -31,17 +48,17 @@
   [t1 t2]
   (cond
     (= t1 t2) {}
-    
+
     (keyword? t1)
     (if (occurs? t1 t2)
       nil
       {t1 t2})
-    
+
     (keyword? t2)
     (if (occurs? t2 t1)
       nil
       {t2 t1})
-    
+
     (and (vector? t1) (vector? t2)
          (= (first t1) (first t2) '->)
          (= (count t1) (count t2) 3))
@@ -54,7 +71,7 @@
               s2 (unify r1' r2')]
           (when s2
             (merge s1 s2)))))
-    
+
     :else nil))
 
 (defn apply-substitution
@@ -62,27 +79,65 @@
   [subst type]
   (reduce-kv substitute-type type subst))
 
+(defn generalize
+  "Generalize type by making free type variables polymorphic"
+  [type env]
+  (let [env-vars (set (mapcat #(filter keyword? (flatten %)) (vals env)))
+        free-vars (filter keyword? (flatten type))
+        gen-vars (remove env-vars free-vars)]
+    (if (empty? gen-vars)
+      type
+      [:forall gen-vars type])))
+
+(defn instantiate
+  "Instantiate a polymorphic type with fresh type variables"
+  [type]
+  (if (and (vector? type) (= (first type) :forall))
+    (let [[_ vars body] type
+          subst (zipmap vars (repeatedly (count vars) fresh-type-var))]
+      (apply-substitution subst body))
+    type))
+
 (defn infer-type
-  "Infer type of lambda calculus expression"
-  ([expr] (infer-type expr {}))
+  "Infer type of lambda calculus expression with let-polymorphism"
+  ([expr]
+   (reset-type-vars!)
+   (infer-type expr {}))
   ([expr env]
    (cond
      ;; Variable
      (symbol? expr)
      (if-let [type (get env expr)]
-       [type {}]
+       [(instantiate type) {}]
        (let [tvar (fresh-type-var)]
          [tvar {}]))
-     
-     ;; Abstraction: λx.e
-     (and (vector? expr) (= (first expr) 'λ))
+
+     ;; Number literal
+     (number? expr)
+     [:int {}]
+
+     ;; String literal
+     (string? expr)
+     [:string {}]
+
+     ;; Abstraction: λx.e or ['λ x body]
+     (and (vector? expr) (= (first expr) 'λ) (= (count expr) 3))
      (let [[_ param body] expr
            param-type (fresh-type-var)
            [body-type body-subst] (infer-type body (assoc env param param-type))
            result-type ['-> (apply-substitution body-subst param-type) body-type]]
        [result-type body-subst])
-     
-     ;; Application: (f x)
+
+     ;; Let binding: ['let x e1 e2]
+     (and (vector? expr) (= (first expr) 'let) (= (count expr) 4))
+     (let [[_ var e1 e2] expr
+           [t1 s1] (infer-type e1 env)
+           env' (reduce-kv (fn [e k v] (assoc e k (apply-substitution s1 v))) {} env)
+           gen-type (generalize t1 env')
+           [t2 s2] (infer-type e2 (assoc env' var gen-type))]
+       [t2 (merge s1 s2)])
+
+     ;; Application: [f x]
      (and (vector? expr) (= (count expr) 2))
      (let [[func arg] expr
            [func-type func-subst] (infer-type func env)
@@ -95,7 +150,19 @@
          [(apply-substitution unified result-type)
           (merge func-subst arg-subst unified)]
          [nil nil]))
-     
+
+     ;; Built-in operators
+     (and (vector? expr) (contains? #{'+ '- '* '/ '= '< '>} (first expr)))
+     (let [op (first expr)
+           args (rest expr)]
+       (case op
+         (+ - * /) (if (every? #(number? %) args)
+                    [:int {}]
+                    (let [t (fresh-type-var)]
+                      [['-> t ['-> t t]] {}]))
+         (= < >) [['-> :int ['-> :int :bool]] {}]
+         [nil nil]))
+
      :else [nil nil])))
 
 (defn type->string
@@ -104,41 +171,41 @@
   (cond
     (keyword? type) (name type)
     (and (vector? type) (= (first type) '->))
-    (let [[_ arg res] type]
-      (str "(" (type->string arg) " → " (type->string res) ")"))
+    (let [[_ arg res] type
+          arg-str (if (and (vector? arg) (= (first arg) '->))
+                   (str "(" (type->string arg) ")")
+                   (type->string arg))]
+      (str arg-str " → " (type->string res)))
+    (and (vector? type) (= (first type) :forall))
+    (let [[_ vars body] type]
+      (str "∀" (clojure.string/join "," (map name vars)) ". " (type->string body)))
     :else (str type)))
 
 (defn check-type
   "Type check a lambda expression and return human-readable result"
   [expr]
-  (let [[type subst] (infer-type expr)]
-    (if type
-      {:success true
-       :type (type->string type)
-       :raw-type type}
-      {:success false
-       :message "Type inference failed"})))
-
-;; Example type signatures for common functions
-(def type-signatures
-  {'id '(-> :a :a)  ; Identity function
-   'const '(-> :a (-> :b :a))  ; Constant function
-   'compose '(-> (-> :b :c) (-> (-> :a :b) (-> :a :c)))  ; Function composition
-   'apply '(-> (-> :a :b) (-> :a :b))})  ; Function application
-
-(defn validate-tool-type
-  "Validate that a tool's implementation matches expected type"
-  [code expected-type]
   (try
-    (let [parsed (read-string code)
-          [inferred _] (infer-type parsed)]
-      (if inferred
-        (let [unified (unify inferred expected-type)]
-          {:valid (some? unified)
-           :inferred (type->string inferred)
-           :expected (type->string expected-type)})
-        {:valid false
-         :message "Could not infer type"}))
+    (reset-type-vars!)
+    (let [parsed (lambda/parse-lambda-string expr)
+          [type subst] (infer-type parsed)]
+      (if type
+        {:success true
+         :type (type->string type)
+         :raw-type type}
+        {:success false
+         :message "Type inference failed"}))
     (catch js/Error e
-      {:valid false
-       :message (.-message e)})))
+      {:success false
+       :message (str "Error: " (.-message e))})))
+
+;; Common type signatures for reference
+(def type-signatures
+  {'id ['-> :a :a]  ; Identity function
+   'const ['-> :a ['-> :b :a]]  ; Constant function
+   'compose ['-> ['-> :b :c] ['-> ['-> :a :b] ['-> :a :c]]]  ; Function composition
+   'flip ['-> ['-> :a ['-> :b :c]] ['-> :b ['-> :a :c]]]  ; Flip arguments
+   'apply ['-> ['-> :a :b] ['-> :a :b]]  ; Function application
+   'fix ['-> ['-> :a :a] :a]  ; Fixed point (Y combinator)
+   'church-zero ['-> ['-> :a :a] ['-> :a :a]]  ; Church zero
+   'church-succ ['-> ['-> ['-> :a :a] ['-> :a :a]]
+                  ['-> ['-> :a :a] ['-> :a :a]]]})  ; Church successor
