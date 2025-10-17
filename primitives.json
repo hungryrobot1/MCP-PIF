@@ -1,0 +1,62 @@
+{
+  "primitives": {
+    "lambda": {
+      "var": {"syntax": "{\"var\": \"name\"}", "description": "Variable reference"},
+      "lam": {"syntax": "{\"lam\": \"param\", \"body\": term}", "description": "Lambda abstraction"},
+      "app": {"syntax": "{\"app\": {\"func\": ..., \"arg\": ...}}", "description": "Function application"}
+    },
+    "arithmetic": {
+      "add": {"syntax": "{\"add\": [a, b]}", "description": "Addition", "type": "Int -> Int -> Int"},
+      "sub": {"syntax": "{\"sub\": [a, b]}", "description": "Subtraction", "type": "Int -> Int -> Int"},
+      "mul": {"syntax": "{\"mul\": [a, b]}", "description": "Multiplication", "type": "Int -> Int -> Int"},
+      "div": {"syntax": "{\"div\": [a, b]}", "description": "Division (errors on 0)", "type": "Int -> Int -> Int"},
+      "mod": {"syntax": "{\"mod\": [a, b]}", "description": "Modulo", "type": "Int -> Int -> Int"}
+    },
+    "comparison": {
+      "eq": {"syntax": "{\"eq\": [a, b]}", "description": "Equality", "type": "Int -> Int -> Bool"},
+      "lt": {"syntax": "{\"lt\": [a, b]}", "description": "Less than", "type": "Int -> Int -> Bool"},
+      "gt": {"syntax": "{\"gt\": [a, b]}", "description": "Greater than", "type": "Int -> Int -> Bool"},
+      "lte": {"syntax": "{\"lte\": [a, b]}", "description": "Less than or equal", "type": "Int -> Int -> Bool"},
+      "gte": {"syntax": "{\"gte\": [a, b]}", "description": "Greater than or equal", "type": "Int -> Int -> Bool"}
+    },
+    "logic": {
+      "and": {"syntax": "{\"and\": [a, b]}", "description": "Logical AND (short-circuit)", "type": "Bool -> Bool -> Bool"},
+      "or": {"syntax": "{\"or\": [a, b]}", "description": "Logical OR (short-circuit)", "type": "Bool -> Bool -> Bool"},
+      "not": {"syntax": "{\"not\": a}", "description": "Logical NOT", "type": "Bool -> Bool"}
+    },
+    "control": {
+      "if": {"syntax": "{\"if\": {\"cond\": c, \"then\": t, \"else\": e}}", "description": "Conditional branching"},
+      "continue": {"syntax": "{\"continue\": {\"input\": x}}", "description": "Recursive continuation"}
+    },
+    "lists": {
+      "nil": {"syntax": "{\"nil\": true}", "description": "Empty list"},
+      "cons": {"syntax": "{\"cons\": {\"head\": ..., \"tail\": ...}}", "description": "List construction"},
+      "head": {"syntax": "{\"head\": list}", "description": "First element"},
+      "tail": {"syntax": "{\"tail\": list}", "description": "Rest of list"},
+      "isEmpty": {"syntax": "{\"isEmpty\": list}", "description": "Check if empty"},
+      "length": {"syntax": "{\"length\": list}", "description": "List length"},
+      "fold": {"syntax": "{\"fold\": [func, init, list]}", "description": "Universal list reducer"}
+    },
+    "pairs": {
+      "pair": {"syntax": "{\"pair\": [a, b]}", "description": "Pair construction"},
+      "fst": {"syntax": "{\"fst\": pair}", "description": "First element"},
+      "snd": {"syntax": "{\"snd\": pair}", "description": "Second element"}
+    },
+    "strings": {
+      "concat": {"syntax": "{\"concat\": [s1, s2]}", "description": "String concatenation"}
+    },
+    "metaprogramming": {
+      "quote": {"syntax": "{\"quote\": term}", "description": "Prevent evaluation (code as data)"},
+      "eval": {"syntax": "{\"eval\": quoted}", "description": "Execute quoted code"},
+      "code_of": {"syntax": "{\"code_of\": \"tool_name\"}", "description": "Get tool source code"},
+      "self": {"syntax": "{\"self\": true}", "description": "Reference to current closure"}
+    }
+  },
+  "literals": {
+    "int": {"example": "42", "description": "Integer (floats are rounded)"},
+    "bool": {"example": "true", "description": "Boolean value"},
+    "string": {"example": "\"hello\"", "description": "Text string"},
+    "array": {"example": "[1, 2, 3]", "description": "Converts to cons list"},
+    "null": {"example": "null", "description": "Unit value"}
+  }
+}

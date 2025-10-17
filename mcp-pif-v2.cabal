@@ -1,0 +1,36 @@
+cabal-version: 2.4
+name:          mcp-pif-v2
+version:       3.0.0
+synopsis:      JSON-native lambda calculus MCP server
+license:       MIT
+author:        Zachary Grunenberg
+
+executable mcp-pif-v2
+  main-is:          Main.hs
+  other-modules:    Core.Types
+                    Core.Syntax
+                    Core.Parser
+                    Core.Evaluator
+                    Core.Encoder
+                    Tools.Registry
+                    Server
+
+  build-depends:    base >= 4.14 && < 5,
+                    text >= 1.2 && < 3,
+                    containers >= 0.6 && < 1,
+                    unordered-containers >= 0.2 && < 1,
+                    aeson >= 2.0 && < 3,
+                    bytestring >= 0.10 && < 1,
+                    vector >= 0.12 && < 1
+
+  default-language: Haskell2010
+  ghc-options:      -Wall
+                    -Wcompat
+                    -Wincomplete-record-updates
+                    -Wincomplete-uni-patterns
+                    -Wredundant-constraints
+                    -O2
+                    -threaded
+                    -rtsopts
+                    -with-rtsopts=-N
+
