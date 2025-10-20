@@ -58,6 +58,7 @@ data RuntimeValue
   | RUnit
   deriving (Show, Eq)
 
+-- Recursive function state, see Syntax.hs for details
 data ContinuationState = ContinuationState
   { contToolName :: Text
   , contInput :: Value

@@ -1,15 +1,12 @@
 # MCP-PIF
 
-A JSON-native lambda calculus runtime with metacircular evaluation, designed as an MCP (Model Context Protocol) server. Enables language models to evolve tools dynamically through formal metaprogramming constructs.
+A JSON-native lambda calculus runtime with metacircular evaluation, designed as an MCP (Model Context Protocol) server. Enables language models to evolve tools dynamically through metaprogramming.
 
 ## Quick Start
 
 ```bash
 # Build the project
 cabal build
-
-# Run the MCP server (communicates via stdin/stdout)
-cabal run mcp-pif
 
 # Enable debug mode for detailed evaluation tracing
 MCP_DEBUG=1 cabal run mcp-pif
@@ -66,7 +63,10 @@ MCP_DEBUG=1 cabal run mcp-pif
 ## Core Concepts
 
 ### The Problem
-Language models need to create and modify their own computational tools, but existing systems either provide fixed APIs or unrestricted code execution. We need a middle path: safe, inspectable, evolvable computation.
+
+For pure computation language models need computational tools, but existing systems either provide fixed APIs or unrestricted code execution. In the context of metaprogramming and self-modification, neither is ideal. This program presents a middle ground structure for safe, inspectable, evolvable computation.
+
+In the ideal sense, MCP-PIF can be thought of as a generic, metamorphic computer interface where the language model drops-in as an executive function. Here, we provide a simple vocabulary of lambda calculus primitives for access to pure computing only.
 
 ### The Solution
 MCP-PIF provides a lambda calculus with three metaprogramming primitives:
@@ -91,11 +91,14 @@ This prevents eval'd code from inheriting the wrong tool context. When `eval` ex
 - **`__eval_depth` counter is added** (max depth: 100, prevents infinite eval loops)
 
 ### The Event Horizon
-Tools operate at two distinct levels:
-- **MCP level**: Tool creation via `evolve` (effectful, mutates registry)
-- **Lambda level**: Tool execution via `run` (pure, functional)
 
-Evolved tools can interact with each other but cannot themselves evolve new tools without the access to the protocol-level tool registry. This prevents unbounded self-modification while enabling rich metaprogramming.
+Because this framework is built in MCP it makes significant compromises in purity. Namely, updating the server code is not part of the metaprogramming loop. This means that the list of primitives, parsing strategies, and the evolution and evaluation processes themselves are not modifiable during runtime.
+
+There are two kinds of tools:
+- **MCP tools**: For example creation via `evolve` (effectful, mutates registry)
+- **Evolved tools**: Tool execution via `run` (pure, functional)
+
+Evolved tools can interact with each other but cannot themselves evolve new tools without the access to the protocol-level tool registry. This "simulacrum" implementation prevents unbounded self-modification by isolating the very invariants which enable the rich metaprogramming.
 
 ## Language Reference
 
@@ -234,7 +237,21 @@ Tools can use continuation-based recursion for step-by-step execution. Since `co
 The program will return a structured response:
 
 ```json
+{
+  "type": "continuation",
+  "message": "Recursive step needed. Call run again with:",
+  "tool": "factorial_acc",
+  "next_input": {
+    "pair": [4, 5]
+  },
+  "step": 1
+}
+```
 
+This renders for the client as a Haskell representation:
+
+```haskell
+Object (fromList [("message",String "Recursive step needed. Call run again with:"),("next_input",Object (fromList [("pair",Array [Number 4.0,Number 5.0])])),("step",Number 1.0),("tool",String "factorial_acc"),("type",String "continuation")])
 ```
 
 **Important:** The tool takes a pair `[n, accumulator]` as input. Start with `[5, 1]` to compute 5!. Each continuation step multiplies the accumulator by the current n, then decrements n.
